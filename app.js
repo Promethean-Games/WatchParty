@@ -1,9 +1,14 @@
-// --- multi-device toggle ---
-const USE_REMOTE = true;       // turn ON multi-device mode (set false to go back to local-only)
-const ROOM_CODE = "demo-room"; // all phones share this room for now
+// Core config
 const STORAGE_KEY = "watch_party_state_v1";
 const COOLDOWN_MS = 5000;
 
+// --- Multi-device toggle ---
+// Set USE_REMOTE = true to use Firebase multi-device mode.
+// All phones that open the site will automatically join ROOM_CODE.
+const USE_REMOTE = true;
+const ROOM_CODE = "demo-room";
+
+// Sample starter lists
 const SAMPLE_LISTS = [
   {
     id: "movie_plot",
@@ -70,6 +75,7 @@ const SAMPLE_LISTS = [
   }
 ];
 
+// Local state (used in both local & remote modes)
 let state = {
   hostName: "",
   players: [], // {id,name,emoji}
@@ -77,9 +83,10 @@ let state = {
   currentList: null, // {id,source}
   activePlayerId: null,
   scores: {}, // playerId -> number
-  cooldowns: {}, // eventKey -> timestamp
+  cooldowns: {}, // eventKey -> timestamp (local mode only)
   history: [] // {id,playerId,eventKey,label,time,points,vetoed}
 };
+
 // --- Remote (Firebase) helpers ---
 let remotePlayerId = null;
 
@@ -89,14 +96,13 @@ function generateId(prefix) {
 }
 
 function joinRemoteRoomIfNeeded() {
-  // If we don't want remote or Firebase isn't loaded, do nothing
   if (!USE_REMOTE) return;
   if (typeof firebase === "undefined" || typeof db === "undefined") {
     console.warn("Remote mode enabled but Firebase is not available.");
     return;
   }
 
-  // Ask this device for a display name (only once, then stored in localStorage)
+  // Ask this device for a display name (once)
   let name = localStorage.getItem("watch_party_player_name") || "";
   if (!name) {
     name = prompt("Enter your name for this Watch Party:") || "Guest";
@@ -108,7 +114,7 @@ function joinRemoteRoomIfNeeded() {
   const emojis = ["🎮", "🍿", "🏈", "🎬", "😂", "🔥", "⭐", "🎧"];
   const emoji = emojis[Math.floor(Math.random() * emojis.length)];
 
-  // Device-specific player id (also stored so it stays the same next time)
+  // Device-specific player id
   remotePlayerId = localStorage.getItem("watch_party_player_id");
   if (!remotePlayerId) {
     remotePlayerId = generateId("p");
@@ -117,13 +123,13 @@ function joinRemoteRoomIfNeeded() {
 
   const roomRef = db.ref("rooms/" + ROOM_CODE);
 
-  // Add / update this player in the shared room
+  // Add / update this player
   roomRef.child("players/" + remotePlayerId).set({
     name,
     emoji
   });
 
-  // Make sure this player has a score entry
+  // Ensure this player has a score entry
   roomRef.child("scores/" + remotePlayerId).transaction((current) => {
     if (current === null || current === undefined) return 0;
     return current;
@@ -131,7 +137,7 @@ function joinRemoteRoomIfNeeded() {
 
   // --- Listen for shared state updates ---
 
-  // Players
+  // Players list
   roomRef.child("players").on("value", (snap) => {
     const val = snap.val() || {};
     state.players = Object.entries(val).map(([id, p]) => ({
@@ -139,10 +145,10 @@ function joinRemoteRoomIfNeeded() {
       name: p.name,
       emoji: p.emoji
     }));
-    // In remote mode, this device always acts as itself
+    // Active player = this device
     state.activePlayerId = remotePlayerId;
     renderPlayersChips();
-    renderPlayersList && renderPlayersList(); // safe call if function exists
+    renderPlayersList();
   });
 
   // Scores
@@ -151,7 +157,7 @@ function joinRemoteRoomIfNeeded() {
     renderPlayersChips();
   });
 
-  // History (feed)
+  // Shared history / feed
   roomRef.child("history").on("value", (snap) => {
     const val = snap.val() || {};
     state.history = Object.entries(val).map(([id, a]) => ({
@@ -161,6 +167,8 @@ function joinRemoteRoomIfNeeded() {
     renderFeed();
   });
 }
+
+// ------- DOM refs -------
 
 const screens = {
   setup: document.getElementById("screen-setup"),
@@ -197,7 +205,8 @@ const vetoBtn = document.getElementById("vetoBtn");
 
 const toastEl = document.getElementById("toast");
 
-// Storage helpers
+// ------- Storage helpers -------
+
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -219,7 +228,8 @@ function saveState() {
   }
 }
 
-// Utils
+// ------- Utils -------
+
 function showToast(msg) {
   toastEl.textContent = msg;
   toastEl.classList.add("show");
@@ -251,14 +261,16 @@ function formatTime(t) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-// Render: players (setup)
+// ------- Render: players (setup) -------
 
 function renderPlayersList() {
   playersList.innerHTML = "";
   if (!state.players.length) {
     const p = document.createElement("p");
     p.className = "subtle";
-    p.textContent = "Add at least one player so we can track points.";
+    p.textContent = USE_REMOTE
+      ? "In multi-device mode, each phone becomes its own player when they open the app."
+      : "Add at least one player so we can track points.";
     playersList.appendChild(p);
     return;
   }
@@ -273,7 +285,11 @@ function renderPlayersList() {
     `;
     chip.addEventListener("click", (e) => {
       if (e.target.classList.contains("remove")) {
-        removePlayer(pl.id);
+        if (USE_REMOTE) {
+          showToast("Players are managed automatically in multi-device mode.");
+        } else {
+          removePlayer(pl.id);
+        }
       } else {
         setActivePlayer(pl.id);
         setScreen("game");
@@ -283,19 +299,19 @@ function renderPlayersList() {
   });
 }
 
-// Render: profile summary
+// ------- Render: profile summary -------
 
 function renderProfileSummary() {
   const count = state.players.length;
   const name = state.hostName || "No host";
   if (!count) {
-    profileSummary.textContent = `${name} • no players added yet`;
+    profileSummary.textContent = `${name} • no players yet`;
   } else {
     profileSummary.textContent = `${name} • ${count} player${count > 1 ? "s" : ""}`;
   }
 }
 
-// Render: list cards
+// ------- Render: list cards -------
 
 function buildListCard(list, source) {
   const card = document.createElement("div");
@@ -372,14 +388,16 @@ function renderListsScreen() {
   renderProfileSummary();
 }
 
-// Render: players bar in game
+// ------- Render: players bar in game -------
 
 function renderPlayersChips() {
   playersChips.innerHTML = "";
   if (!state.players.length) {
     const p = document.createElement("p");
     p.className = "subtle";
-    p.textContent = "Add players on the crew screen to start scoring.";
+    p.textContent = USE_REMOTE
+      ? "Ask friends to open the same URL on their phones; they’ll appear here automatically."
+      : "Add players on the crew screen to start scoring.";
     playersChips.appendChild(p);
     return;
   }
@@ -403,7 +421,7 @@ function renderPlayersChips() {
   });
 }
 
-// Render: events list
+// ------- Render: events list -------
 
 function getCurrentEvents() {
   const list = findListByRef(state.currentList);
@@ -440,16 +458,7 @@ function renderEventsList() {
 
       const metaEl = document.createElement("div");
       metaEl.className = "event-card-meta";
-      const cooldownTs = state.cooldowns[ev.key];
-      let metaText = "";
-      if (cooldownTs && Date.now() - cooldownTs < COOLDOWN_MS) {
-        card.classList.add("cooling");
-        const diff = Math.ceil((COOLDOWN_MS - (Date.now() - cooldownTs)) / 1000);
-        metaText = `Locked • ${diff}s`;
-      } else {
-        metaText = "Tap when it happens";
-      }
-      metaEl.innerHTML = `<span>${metaText}</span>`;
+      metaEl.innerHTML = `<span>Tap when it happens</span>`;
 
       card.appendChild(labelEl);
       card.appendChild(metaEl);
@@ -460,7 +469,7 @@ function renderEventsList() {
     });
 }
 
-// Render: feed
+// ------- Render: feed -------
 
 function renderFeed() {
   feedList.innerHTML = "";
@@ -502,7 +511,7 @@ function renderFeed() {
   });
 }
 
-// Render: game screen main
+// ------- Render: game screen -------
 
 function renderGameScreen() {
   const list = findListByRef(state.currentList);
@@ -518,9 +527,13 @@ function renderGameScreen() {
   renderFeed();
 }
 
-// Mutators
+// ------- Mutators -------
 
 function ensureActivePlayer() {
+  if (USE_REMOTE && remotePlayerId) {
+    state.activePlayerId = remotePlayerId;
+    return;
+  }
   if (state.activePlayerId && state.players.some((p) => p.id === state.activePlayerId)) return;
   if (state.players.length) {
     state.activePlayerId = state.players[0].id;
@@ -562,8 +575,10 @@ function removePlayer(id) {
   renderPlayersList();
 }
 
+// ------- Event tap (local + remote) -------
+
 function handleEventTap(eventKey, label, el) {
-  // --- Remote mode: write to Firebase so all devices see it ---
+  // Remote: write tap to Firebase so all devices see it
   if (USE_REMOTE && remotePlayerId && typeof db !== "undefined") {
     const roomRef = db.ref("rooms/" + ROOM_CODE);
     const historyRef = roomRef.child("history");
@@ -580,13 +595,9 @@ function handleEventTap(eventKey, label, el) {
       vetoed: false
     };
 
-    // Add this tap to the shared history
     historyRef.child(actionId).set(action);
-
-    // Bump this device's score
     scoresRef.transaction((current) => (current || 0) + 1);
 
-    // Local visual feedback
     el.classList.add("pressed");
     setTimeout(() => {
       el.classList.remove("pressed");
@@ -596,7 +607,7 @@ function handleEventTap(eventKey, label, el) {
     return;
   }
 
-  // --- Local mode fallback (original single-device behavior) ---
+  // Local fallback
   if (!state.players.length) {
     showToast("Add at least one player first.");
     return;
@@ -639,28 +650,41 @@ function handleEventTap(eventKey, label, el) {
   renderPlayersChips();
   renderFeed();
   renderEventsList();
-};
-
-
-  // Visual bump
-  el.classList.add("pressed", "cooling");
-  setTimeout(() => {
-    el.classList.remove("pressed");
-  }, 220);
-  setTimeout(() => {
-    // Only remove cooling state if cooldown expired
-    if (Date.now() - state.cooldowns[eventKey] >= COOLDOWN_MS) {
-      const still = eventsList.querySelector(`.event-card[data-key="${eventKey}"]`);
-      if (still) still.classList.remove("cooling");
-    }
-  }, COOLDOWN_MS + 100);
-
-  renderPlayersChips();
-  renderFeed();
-  renderEventsList();
 }
 
+// ------- Veto last tap (local + remote) -------
+
 function vetoLastTap() {
+  if (USE_REMOTE && typeof db !== "undefined") {
+    const roomRef = db.ref("rooms/" + ROOM_CODE);
+    const historyRef = roomRef.child("history");
+
+    historyRef.once("value").then((snap) => {
+      const val = snap.val() || {};
+      const entries = Object.entries(val);
+      if (!entries.length) {
+        showToast("No tap to veto.");
+        return;
+      }
+      // sort by time and find last non-vetoed
+      const sorted = entries.sort((a, b) => (a[1].time || 0) - (b[1].time || 0));
+      const last = [...sorted].reverse().find(([, a]) => !a.vetoed);
+      if (!last) {
+        showToast("No tap to veto.");
+        return;
+      }
+      const [actionId, action] = last;
+
+      historyRef.child(actionId).child("vetoed").set(true);
+      const scoreRef = roomRef.child("scores/" + action.playerId);
+      scoreRef.transaction((current) => (current || 0) - 1);
+
+      showToast("Last tap vetoed.");
+    });
+    return;
+  }
+
+  // Local behavior
   const lastTap = [...state.history].reverse().find((a) => !a.vetoed);
   if (!lastTap) {
     showToast("No tap to veto.");
@@ -677,6 +701,15 @@ function vetoLastTap() {
 
 function resetScores() {
   if (!state.players.length) return;
+
+  if (USE_REMOTE && typeof db !== "undefined") {
+    if (!confirm("Reset all scores for this room?")) return;
+    const roomRef = db.ref("rooms/" + ROOM_CODE);
+    roomRef.child("scores").set({});
+    showToast("Scores reset for this room.");
+    return;
+  }
+
   if (!confirm("Reset all scores for this session?")) return;
   state.players.forEach((p) => {
     state.scores[p.id] = 0;
@@ -717,7 +750,7 @@ function saveCustomList() {
   showToast("List saved to this device.");
 }
 
-// Init
+// ------- Init -------
 
 function initFromState() {
   hostNameInput.value = state.hostName || "";
@@ -727,7 +760,7 @@ function initFromState() {
   renderGameScreen();
 }
 
-// Event listeners
+// ------- Event listeners -------
 
 hostNameInput.addEventListener("input", () => {
   state.hostName = hostNameInput.value.trim();
@@ -735,7 +768,12 @@ hostNameInput.addEventListener("input", () => {
   renderProfileSummary();
 });
 
+// In remote mode, manual Add is disabled (each phone = a player)
 addPlayerBtn.addEventListener("click", () => {
+  if (USE_REMOTE) {
+    showToast("In multi-device mode, each phone is its own player. Just open this page on each device.");
+    return;
+  }
   addPlayer(playerNameInput.value, playerAvatarSelect.value);
   playerNameInput.value = "";
   playerNameInput.focus();
@@ -743,13 +781,17 @@ addPlayerBtn.addEventListener("click", () => {
 
 playerNameInput.addEventListener("keypress", (e) => {
   if (e.key === "Enter") {
+    if (USE_REMOTE) {
+      showToast("In multi-device mode, each phone is its own player.");
+      return;
+    }
     addPlayer(playerNameInput.value, playerAvatarSelect.value);
     playerNameInput.value = "";
   }
 });
 
 toListsBtn.addEventListener("click", () => {
-  if (!state.players.length) {
+  if (!state.players.length && !USE_REMOTE) {
     showToast("Add at least one player first.");
     return;
   }
@@ -773,7 +815,8 @@ eventSearchInput.addEventListener("input", () => {
 vetoBtn.addEventListener("click", vetoLastTap);
 resetScoresBtn.addEventListener("click", resetScores);
 
-// Boot
+// ------- Boot -------
+
 loadState();
 initFromState();
 joinRemoteRoomIfNeeded();
