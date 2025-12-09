@@ -1,74 +1,132 @@
-// Core config
+// Version & keys
+const VERSION = "v0.6.0";
+
 const STORAGE_KEY = "watch_party_state_v1";
+const TUTORIAL_KEY = "watch_party_tutorial_seen";
+const THEME_KEY = "watch_party_theme";
+const HAND_KEY = "watch_party_hand";
+const MOTION_KEY = "watch_party_motion";
+
 const COOLDOWN_MS = 5000;
 
-// --- Multi-device toggle ---
 // We TRY to use Firebase cloud mode. If it fails, we fall back to local hotseat.
 const USE_REMOTE = true;
 
 // Sample starter lists
 const SAMPLE_LISTS = [
+  // MOVIES
   {
-    id: "movie_plot",
+    id: "movie_tropes",
     source: "sample",
-    name: "Movie Night – Plot Twists",
+    name: "Blockbuster – Movie Night Tropes",
     category: "Movie",
     events: [
-      "Someone says “I have a bad feeling about this”",
+      "Opening shot over a city skyline",
+      "Someone says \"I have a bad feeling about this\"",
       "Phone rings at the worst possible moment",
-      "Jump scare or loud sting",
-      "Villain explains their master plan",
-      "Hero ignores obvious warning",
       "Car won’t start when they need it",
-      "Dramatic slow clap",
-      "Flashback explains hidden truth",
-      "Character whispers “trust me”",
-      "Plot twist reveals secret ally",
-      "Someone dramatically drops a glass",
-      "Fake-out death",
-      "Surprise romance reveal"
+      "Slow clap or sarcastic clap",
+      "Villain explains their master plan",
+      "Hero ignores an obvious warning",
+      "Dramatic walk-away from an explosion",
+      "Fake-out death or \"you thought I was gone\"",
+      "End credits tease a sequel"
     ]
   },
+
+  // LIVE SPORTS
   {
-    id: "nfl_game",
+    id: "sports_nfl",
     source: "sample",
     name: "NFL – Sunday Chaos",
     category: "Sports",
     events: [
       "Field goal blocked",
+      "Turnover in the red zone",
+      "Coach slams headset or clipboard",
       "Challenge flag thrown",
-      "Coach slams headset",
-      "Booth says “momentum shift”",
-      "QB gets sacked",
-      "Two-point conversion attempt",
-      "Big one-handed catch",
-      "Turnover in red zone",
-      "Ref huddle lasts forever",
-      "Broadcaster mentions fantasy football",
-      "“This crowd is electric”",
+      "Broadcaster says \"momentum shift\"",
+      "QB gets sacked on 3rd down",
+      "One-handed catch",
+      "Flag on a huge play",
       "Time-out right before a kick",
-      "Trick play or flea flicker"
+      "Booth mentions fantasy football"
     ]
   },
   {
-    id: "sitcom_bingo",
+    id: "sports_nba",
     source: "sample",
-    name: "Sitcom – Laugh Track Bingo",
+    name: "NBA – Crunch Time Energy",
+    category: "Sports",
+    events: [
+      "Fast-break dunk",
+      "Player gets a technical foul",
+      "Coach calls timeout after a big run",
+      "Commentator says \"that’s a heat check\"",
+      "Replay review for out-of-bounds or foul",
+      "Crowd starts a loud chant",
+      "3-pointer from way beyond the arc",
+      "And-one free throw",
+      "Someone complains about a no-call",
+      "Announcer says \"this crowd is electric\""
+    ]
+  },
+
+  // TV / SERIES
+  {
+    id: "tv_drama",
+    source: "sample",
+    name: "Prime Time Drama – Twist Watch",
+    category: "Series",
+    events: [
+      "\"We need to talk\" moment",
+      "Someone overhears a conversation they shouldn’t",
+      "Flashback reveals missing information",
+      "Character keeps a big secret from someone",
+      "Cliffhanger right before a commercial break",
+      "Text message changes everything",
+      "Storm or blackout used for drama",
+      "Someone dramatically walks out of a room",
+      "Unexpected character shows up at the door",
+      "Last line of the episode is a twist"
+    ]
+  },
+  {
+    id: "tv_sitcom",
+    source: "sample",
+    name: "Comfort Sitcom – Laugh Track Bingo",
     category: "Series",
     events: [
       "Door slam for comedic effect",
       "Obvious studio audience laugh",
-      "Spit-take or nearly spit drink",
+      "Spit-take or almost spit drink",
       "Awkward silence after a joke",
-      "Character enters to applause",
       "Catchphrase moment",
-      "Someone storms out of the room",
-      "Misunderstood conversation",
-      "Someone hides in a closet or under bed",
-      "“We need to talk” moment",
-      "Group hug to end scene",
-      "Cheesy freeze-frame",
-      "Very special episode speech"
+      "Someone trips, falls, or bumps into something",
+      "Misunderstood conversation causes chaos",
+      "Someone hides in a closet or under a bed",
+      "Group hug to end a scene",
+      "Freeze-frame or cheesy final shot"
+    ]
+  },
+
+  // OTHER / FAMILY / PARTY
+  {
+    id: "other_family",
+    source: "sample",
+    name: "Family Gathering – Chaos Mode",
+    category: "Other",
+    events: [
+      "Someone brings up an old embarrassing story",
+      "Two people talk over each other",
+      "Awkward silence after a comment",
+      "Someone disappears to \"check on the food\"",
+      "Phone comes out to show a meme or video",
+      "Family photo attempt takes way too long",
+      "Someone says \"remember when…\"",
+      "Food or drink is spilled",
+      "Inside joke nobody explains to new people",
+      "Conversation suddenly gets way too deep"
     ]
   }
 ];
@@ -76,7 +134,7 @@ const SAMPLE_LISTS = [
 // Local state (used in both local & remote modes)
 let state = {
   hostName: "",
-  roomCode: "",         // dynamic room code, e.g. "4FG9"
+  roomCode: "",
   players: [],          // {id,name,emoji}
   customLists: [],      // {id,name,category,events}
   currentList: null,    // {id,source}
@@ -89,6 +147,10 @@ let state = {
 // --- Remote (Firebase) helpers ---
 let remotePlayerId = null;
 let remoteEnabled = false; // becomes true only when Firebase is actually connected
+
+// Tutorial state
+let tutorialIndex = 0;
+let tutorialTouchStartX = null;
 
 // simple id generator
 function generateId(prefix) {
@@ -116,6 +178,7 @@ function isRemoteActive() {
 function joinRemoteRoomIfNeeded() {
   if (!USE_REMOTE) {
     remoteEnabled = false;
+    updateModeHint();
     return;
   }
 
@@ -140,7 +203,6 @@ function joinRemoteRoomIfNeeded() {
   }
 
   try {
-    // Ask this device for a display name (once)
     let name = localStorage.getItem("watch_party_player_name") || "";
     if (!name) {
       name = prompt("Enter your name for this Watch Party:") || "Guest";
@@ -148,11 +210,9 @@ function joinRemoteRoomIfNeeded() {
       localStorage.setItem("watch_party_player_name", name);
     }
 
-    // Random emoji for this device
     const emojis = ["🎮", "🍿", "🏈", "🎬", "😂", "🔥", "⭐", "🎧"];
     const emoji = emojis[Math.floor(Math.random() * emojis.length)];
 
-    // Device-specific player id
     remotePlayerId = localStorage.getItem("watch_party_player_id");
     if (!remotePlayerId) {
       remotePlayerId = generateId("p");
@@ -161,19 +221,15 @@ function joinRemoteRoomIfNeeded() {
 
     const roomRef = db.ref("rooms/" + rawCode);
 
-    // Add / update this player
     roomRef.child("players/" + remotePlayerId).set({
       name,
       emoji
     });
 
-    // Ensure this player has a score entry
     roomRef.child("scores/" + remotePlayerId).transaction((current) => {
       if (current === null || current === undefined) return 0;
       return current;
     });
-
-    // --- Listen for shared state updates ---
 
     roomRef.child("players").on("value", (snap) => {
       const val = snap.val() || {};
@@ -182,7 +238,6 @@ function joinRemoteRoomIfNeeded() {
         name: p.name,
         emoji: p.emoji
       }));
-      // Active player = this device
       state.activePlayerId = remotePlayerId;
       renderPlayersChips();
       renderPlayersList();
@@ -253,6 +308,25 @@ const feedList = document.getElementById("feedList");
 const vetoBtn = document.getElementById("vetoBtn");
 
 const toastEl = document.getElementById("toast");
+const roomCodeHeader = document.getElementById("roomCodeHeader");
+const versionFooter = document.getElementById("versionFooter");
+
+// Settings & tutorial DOM refs
+const settingsBtn = document.getElementById("settingsBtn");
+const settingsOverlay = document.getElementById("settingsOverlay");
+const settingsCloseBtn = document.getElementById("settingsCloseBtn");
+const settingsTutorialBtn = document.getElementById("settingsTutorialBtn");
+const settingsThemeSelect = document.getElementById("settingsThemeSelect");
+const settingsHandToggle = document.getElementById("settingsHandToggle");
+const settingsMotionToggle = document.getElementById("settingsMotionToggle");
+
+const tutorialOverlay = document.getElementById("tutorialOverlay");
+const tutorialSlidesWrapper = document.getElementById("tutorialSlidesWrapper");
+const tutorialSlides = document.querySelectorAll(".tutorial-slide");
+const tutorialDots = document.querySelectorAll(".tutorial-dot");
+const tutorialPrevBtn = document.getElementById("tutorialPrevBtn");
+const tutorialNextBtn = document.getElementById("tutorialNextBtn");
+const tutorialSkipBtn = document.getElementById("tutorialSkipBtn");
 
 // ------- Storage helpers -------
 
@@ -283,10 +357,8 @@ function showToast(msg) {
   toastEl.textContent = msg;
   toastEl.classList.add("show");
   clearTimeout(showToast._t);
-  toastEl._visible = true;
   showToast._t = setTimeout(() => {
     toastEl.classList.remove("show");
-    toastEl._visible = false;
   }, 2100);
 }
 
@@ -312,9 +384,65 @@ function formatTime(t) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+// Theme & layout
+
+function applyTheme(theme) {
+  const body = document.body;
+  if (theme === "light") {
+    body.classList.add("theme-light");
+  } else {
+    body.classList.remove("theme-light");
+    theme = "dark";
+  }
+  localStorage.setItem(THEME_KEY, theme);
+  if (settingsThemeSelect) settingsThemeSelect.value = theme;
+}
+
+function applyHandedness(mode) {
+  const body = document.body;
+  if (mode === "right") {
+    body.classList.add("right-handed");
+  } else {
+    body.classList.remove("right-handed");
+    mode = "left";
+  }
+  localStorage.setItem(HAND_KEY, mode);
+  if (settingsHandToggle) settingsHandToggle.checked = mode === "right";
+}
+
+function applyMotion(reduced) {
+  const body = document.body;
+  if (reduced) {
+    body.classList.add("reduce-motion");
+  } else {
+    body.classList.remove("reduce-motion");
+  }
+  localStorage.setItem(MOTION_KEY, reduced ? "1" : "0");
+  if (settingsMotionToggle) settingsMotionToggle.checked = reduced;
+}
+
+function updateRoomCodeHeader() {
+  if (!roomCodeHeader) return;
+  const code = getRoomCodeLabel();
+  if (!code) {
+    roomCodeHeader.style.display = "none";
+    roomCodeHeader.textContent = "";
+    return;
+  }
+  roomCodeHeader.style.display = "block";
+  if (isRemoteActive()) {
+    roomCodeHeader.textContent = `Room code: ${code}`;
+  } else {
+    roomCodeHeader.textContent = `Room code: ${code} (not connected)`;
+  }
+}
+
 function updateModeHint() {
   const hintEl = document.querySelector(".field-hint");
-  if (!hintEl) return;
+  if (!hintEl) {
+    updateRoomCodeHeader();
+    return;
+  }
 
   if (isRemoteActive()) {
     hintEl.textContent = `Multi-device: share this code and tap Connect on each phone to join "${getRoomCodeLabel()}".`;
@@ -324,6 +452,65 @@ function updateModeHint() {
     hintEl.textContent = "Choose a room code and tap Connect, or just use hotseat.";
   } else {
     hintEl.textContent = "Hotseat: everyone shares this device.";
+  }
+
+  updateRoomCodeHeader();
+}
+
+// ------- Tutorial helpers -------
+
+function hasSeenTutorial() {
+  return localStorage.getItem(TUTORIAL_KEY) === "1";
+}
+
+function markTutorialSeen() {
+  localStorage.setItem(TUTORIAL_KEY, "1");
+}
+
+function setTutorialSlide(idx) {
+  const maxIndex = tutorialSlides.length - 1;
+  tutorialIndex = Math.max(0, Math.min(idx, maxIndex));
+
+  tutorialSlides.forEach((s, i) => {
+    if (i === tutorialIndex) s.classList.add("active");
+    else s.classList.remove("active");
+  });
+
+  tutorialDots.forEach((d, i) => {
+    if (i === tutorialIndex) d.classList.add("active");
+    else d.classList.remove("active");
+  });
+
+  if (tutorialIndex === 0) {
+    tutorialPrevBtn.disabled = true;
+  } else {
+    tutorialPrevBtn.disabled = false;
+  }
+
+  if (tutorialIndex === maxIndex) {
+    tutorialNextBtn.textContent = "Done";
+  } else {
+    tutorialNextBtn.textContent = "Next";
+  }
+}
+
+function openTutorial(initial = false) {
+  if (!tutorialOverlay) return;
+  tutorialOverlay.classList.add("open");
+  setTutorialSlide(0);
+}
+
+function closeTutorial(markSeen) {
+  if (!tutorialOverlay) return;
+  tutorialOverlay.classList.remove("open");
+  if (markSeen) {
+    markTutorialSeen();
+  }
+}
+
+function maybeShowTutorial() {
+  if (!hasSeenTutorial()) {
+    openTutorial(true);
   }
 }
 
@@ -445,13 +632,11 @@ function buildListCard(list, source) {
 }
 
 function renderListsScreen() {
-  // Sample lists
   sampleListsEl.innerHTML = "";
   SAMPLE_LISTS.forEach((list) => {
     sampleListsEl.appendChild(buildListCard(list, "sample"));
   });
 
-  // Custom lists
   customListsEl.innerHTML = "";
   if (!state.customLists.length) {
     customListsEl.classList.add("empty-state");
@@ -754,7 +939,6 @@ function vetoLastTap() {
         showToast("No tap to veto.");
         return;
       }
-      // sort by time and find last non-vetoed
       const sorted = entries.sort((a, b) => (a[1].time || 0) - (b[1].time || 0));
       const last = [...sorted].reverse().find(([, a]) => !a.vetoed);
       if (!last) {
@@ -772,7 +956,6 @@ function vetoLastTap() {
     return;
   }
 
-  // Local behavior
   const lastTap = [...state.history].reverse().find((a) => !a.vetoed);
   if (!lastTap) {
     showToast("No tap to veto.");
@@ -840,10 +1023,23 @@ function saveCustomList() {
 
 // ------- Init -------
 
+function applySavedPreferences() {
+  const theme = localStorage.getItem(THEME_KEY) || "dark";
+  const hand = localStorage.getItem(HAND_KEY) || "left";
+  const motion = localStorage.getItem(MOTION_KEY) === "1";
+
+  applyTheme(theme);
+  applyHandedness(hand);
+  applyMotion(motion);
+
+  if (versionFooter) {
+    versionFooter.textContent = `Watch Party ${VERSION}`;
+  }
+}
+
 function initFromState() {
   hostNameInput.value = state.hostName || "";
 
-  // If we already have a room code stored, use it; otherwise generate one for convenience
   if (!state.roomCode && USE_REMOTE) {
     state.roomCode = generateRoomCode();
     saveState();
@@ -930,11 +1126,89 @@ eventSearchInput.addEventListener("input", () => {
 vetoBtn.addEventListener("click", vetoLastTap);
 resetScoresBtn.addEventListener("click", resetScores);
 
+// Settings UI
+settingsBtn.addEventListener("click", () => {
+  settingsOverlay.classList.add("open");
+});
+
+settingsCloseBtn.addEventListener("click", () => {
+  settingsOverlay.classList.remove("open");
+});
+
+settingsOverlay.addEventListener("click", (e) => {
+  if (e.target === settingsOverlay) {
+    settingsOverlay.classList.remove("open");
+  }
+});
+
+settingsThemeSelect.addEventListener("change", () => {
+  applyTheme(settingsThemeSelect.value);
+});
+
+settingsHandToggle.addEventListener("change", () => {
+  applyHandedness(settingsHandToggle.checked ? "right" : "left");
+});
+
+settingsMotionToggle.addEventListener("change", () => {
+  applyMotion(settingsMotionToggle.checked);
+});
+
+settingsTutorialBtn.addEventListener("click", () => {
+  settingsOverlay.classList.remove("open");
+  openTutorial(false);
+});
+
+// Tutorial UI
+tutorialNextBtn.addEventListener("click", () => {
+  const maxIndex = tutorialSlides.length - 1;
+  if (tutorialIndex < maxIndex) {
+    setTutorialSlide(tutorialIndex + 1);
+  } else {
+    closeTutorial(true);
+  }
+});
+
+tutorialPrevBtn.addEventListener("click", () => {
+  setTutorialSlide(tutorialIndex - 1);
+});
+
+tutorialSkipBtn.addEventListener("click", () => {
+  closeTutorial(true);
+});
+
+tutorialDots.forEach((dot) => {
+  dot.addEventListener("click", () => {
+    const idx = parseInt(dot.dataset.index, 10) || 0;
+    setTutorialSlide(idx);
+  });
+});
+
+// Swipe emulation for tutorial
+if (tutorialSlidesWrapper) {
+  tutorialSlidesWrapper.addEventListener("touchstart", (e) => {
+    if (!e.touches || !e.touches.length) return;
+    tutorialTouchStartX = e.touches[0].clientX;
+  });
+
+  tutorialSlidesWrapper.addEventListener("touchend", (e) => {
+    if (tutorialTouchStartX === null) return;
+    const dx = e.changedTouches[0].clientX - tutorialTouchStartX;
+    tutorialTouchStartX = null;
+    const threshold = 40;
+    if (dx > threshold) {
+      setTutorialSlide(tutorialIndex - 1);
+    } else if (dx < -threshold) {
+      setTutorialSlide(tutorialIndex + 1);
+    }
+  });
+}
+
 // ------- Boot -------
 
 loadState();
+applySavedPreferences();
 initFromState();
-// Auto-reconnect to previous room if we had one saved
 if (USE_REMOTE && getRoomCodeLabel()) {
   joinRemoteRoomIfNeeded();
 }
+maybeShowTutorial();
