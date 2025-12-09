@@ -12,10 +12,10 @@ const ROOM_CODE = "demo-room";
 const SAMPLE_LISTS = [
   {
     id: "movie_plot",
-    source: "sample",
-    name: "Movie Night – Plot Twists",
-    category: "Movie",
-    events: [
+  source: "sample",
+  name: "Movie Night – Plot Twists",
+  category: "Movie",
+  events: [
       "Someone says “I have a bad feeling about this”",
       "Phone rings at the worst possible moment",
       "Jump scare or loud sting",
@@ -78,13 +78,13 @@ const SAMPLE_LISTS = [
 // Local state (used in both local & remote modes)
 let state = {
   hostName: "",
-  players: [], // {id,name,emoji}
-  customLists: [], // {id,name,category,events}
-  currentList: null, // {id,source}
+  players: [],          // {id,name,emoji}
+  customLists: [],      // {id,name,category,events}
+  currentList: null,    // {id,source}
   activePlayerId: null,
-  scores: {}, // playerId -> number
-  cooldowns: {}, // eventKey -> timestamp (local mode only)
-  history: [] // {id,playerId,eventKey,label,time,points,vetoed}
+  scores: {},           // playerId -> number
+  cooldowns: {},        // eventKey -> timestamp (local mode only)
+  history: []           // {id,playerId,eventKey,label,time,points,vetoed}
 };
 
 // --- Remote (Firebase) helpers ---
@@ -149,6 +149,7 @@ function joinRemoteRoomIfNeeded() {
     state.activePlayerId = remotePlayerId;
     renderPlayersChips();
     renderPlayersList();
+    renderProfileSummary();
   });
 
   // Scores
@@ -269,7 +270,7 @@ function renderPlayersList() {
     const p = document.createElement("p");
     p.className = "subtle";
     p.textContent = USE_REMOTE
-      ? "In multi-device mode, each phone becomes its own player when they open the app."
+      ? `Multi-device: open this page on each phone to join room "${ROOM_CODE}".`
       : "Add at least one player so we can track points.";
     playersList.appendChild(p);
     return;
@@ -305,9 +306,13 @@ function renderProfileSummary() {
   const count = state.players.length;
   const name = state.hostName || "No host";
   if (!count) {
-    profileSummary.textContent = `${name} • no players yet`;
+    profileSummary.textContent = USE_REMOTE
+      ? `${name} • room "${ROOM_CODE}" • waiting for players`
+      : `${name} • no players yet`;
   } else {
-    profileSummary.textContent = `${name} • ${count} player${count > 1 ? "s" : ""}`;
+    profileSummary.textContent = USE_REMOTE
+      ? `${name} • room "${ROOM_CODE}" • ${count} player${count > 1 ? "s" : ""}`
+      : `${name} • ${count} player${count > 1 ? "s" : ""}`;
   }
 }
 
@@ -396,7 +401,7 @@ function renderPlayersChips() {
     const p = document.createElement("p");
     p.className = "subtle";
     p.textContent = USE_REMOTE
-      ? "Ask friends to open the same URL on their phones; they’ll appear here automatically."
+      ? `Ask friends to open the same URL on their phones to join room "${ROOM_CODE}".`
       : "Add players on the crew screen to start scoring.";
     playersChips.appendChild(p);
     return;
@@ -517,7 +522,9 @@ function renderGameScreen() {
   const list = findListByRef(state.currentList);
   if (!list) {
     nowPlayingTitle.textContent = "No list loaded";
-    nowPlayingMeta.textContent = "";
+    nowPlayingMeta.textContent = USE_REMOTE
+      ? `Room "${ROOM_CODE}" • load a list to start.`
+      : "";
   } else {
     nowPlayingTitle.textContent = list.name;
     nowPlayingMeta.textContent = `${list.category} • ${list.events.length} events`;
@@ -754,6 +761,15 @@ function saveCustomList() {
 
 function initFromState() {
   hostNameInput.value = state.hostName || "";
+
+  // Update the hint text depending on mode
+  const hintEl = document.querySelector(".field-hint");
+  if (hintEl) {
+    hintEl.textContent = USE_REMOTE
+      ? `Multi-device: open this page on each phone to join room "${ROOM_CODE}".`
+      : "Hotseat: everyone shares this device.";
+  }
+
   renderPlayersList();
   renderListsScreen();
   ensureActivePlayer();
