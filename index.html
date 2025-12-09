@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Watch Party</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="app-header">
+      <div class="logo-mark">
+        <span class="logo-dot"></span>
+        <span class="logo-wave"></span>
+      </div>
+      <div class="logo-text">
+        <h1>Watch Party</h1>
+        <p>Race to react, brag all night.</p>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <!-- Screen: Setup / Players -->
+      <section id="screen-setup" class="screen active">
+        <div class="card">
+          <h2>Your crew</h2>
+          <label class="field">
+            <span class="field-label">Host name</span>
+            <input id="hostNameInput" type="text" maxlength="24" placeholder="e.g. Ace" />
+          </label>
+
+          <div class="field">
+            <div class="field-label-row">
+              <span class="field-label">Players</span>
+              <span class="field-hint">Hotseat: everyone shares this device.</span>
+            </div>
+            <div class="player-input-row">
+              <input id="playerNameInput" type="text" maxlength="18" placeholder="Add player name" />
+              <select id="playerAvatarSelect">
+                <option>🎮</option>
+                <option>🍿</option>
+                <option>🏈</option>
+                <option>🎬</option>
+                <option>😂</option>
+                <option>🔥</option>
+              </select>
+              <button id="addPlayerBtn" class="btn btn-primary">Add</button>
+            </div>
+            <div id="playersList" class="chips-row"></div>
+          </div>
+
+          <div class="tip-row">
+            <span class="tip-icon" tabindex="0">?</span>
+            <span class="tip-text">
+              Tip: tap your name before tapping an event so points go to the right player.
+            </span>
+          </div>
+
+          <button id="toListsBtn" class="btn btn-cta">Save &amp; pick a list</button>
+        </div>
+      </section>
+
+      <!-- Screen: Lists -->
+      <section id="screen-lists" class="screen">
+        <div class="screen-header">
+          <button class="btn btn-ghost" id="listsBackBtn">&larr; Crew</button>
+          <div class="screen-title">
+            <h2>Lists &amp; broadcasts</h2>
+            <p id="profileSummary">No profile yet</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Sample lists</h3>
+          <p class="subtle">Quick start for movies, sports, and shows.</p>
+          <div id="sampleLists" class="list-cards"></div>
+        </div>
+
+        <div class="card">
+          <h3>Your custom lists</h3>
+          <p class="subtle">Saved to this device for future watch nights.</p>
+          <div id="customLists" class="list-cards empty-state">
+            <p class="subtle">No custom lists yet. Create one below.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Create a new list</h3>
+          <label class="field">
+            <span class="field-label">List name</span>
+            <input id="listNameInput" type="text" maxlength="40" placeholder="e.g. Sunday Night Football" />
+          </label>
+          <label class="field">
+            <span class="field-label">Category</span>
+            <select id="listCategorySelect">
+              <option value="Movie">Movie</option>
+              <option value="Sports">Sports</option>
+              <option value="Series">TV series</option>
+              <option value="Other">Other</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-label">
+              Events (one per line)
+            </span>
+            <textarea id="listEventsInput" rows="5" placeholder="Field goal blocked
+Awkward silence
+Someone yells at the ref"></textarea>
+          </label>
+          <div class="tip-row">
+            <span class="tip-icon" tabindex="0">?</span>
+            <span class="tip-text">
+              Gesture tip: tap an event when it happens on screen. We’ll handle the rest.
+            </span>
+          </div>
+          <button id="saveListBtn" class="btn btn-primary">Save list</button>
+        </div>
+      </section>
+
+      <!-- Screen: Game -->
+      <section id="screen-game" class="screen">
+        <div class="screen-header">
+          <button class="btn btn-ghost" id="gameBackToListsBtn">&larr; Lists</button>
+          <div class="screen-title">
+            <h2 id="nowPlayingTitle">No list loaded</h2>
+            <p id="nowPlayingMeta" class="subtle"></p>
+          </div>
+        </div>
+
+        <div class="card card-compact">
+          <div class="players-bar">
+            <div class="players-bar-top">
+              <span class="field-label">Who’s tapping?</span>
+              <button id="resetScoresBtn" class="btn btn-ghost small">Reset scores</button>
+            </div>
+            <div id="playersChips" class="chips-row compact"></div>
+          </div>
+        </div>
+
+        <div class="card card-compact">
+          <div class="search-row">
+            <input id="eventSearchInput" type="search" placeholder="Search events (e.g. 'touchdown')" />
+          </div>
+          <div class="tip-row small">
+            <span class="tip-icon" tabindex="0">?</span>
+            <span class="tip-text">
+              Tap an event to claim it. We lock it for 5 seconds so nobody can spam it.
+            </span>
+          </div>
+        </div>
+
+        <div class="card game-layout">
+          <div class="events-column">
+            <h3>Event list</h3>
+            <div id="eventsList" class="events-grid"></div>
+          </div>
+          <div class="feed-column">
+            <div class="feed-header">
+              <h3>Live feed</h3>
+              <button id="vetoBtn" class="btn btn-warning small">
+                Veto last tap
+              </button>
+            </div>
+            <ul id="feedList" class="feed-list"></ul>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast"></div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker
+          .register('service-worker.js')
+          .catch(function () {});
+      });
+    }
+  </script>
+</body>
+</html>
