@@ -11,15 +11,19 @@
 <body>
   <div id="app">
     <header class="app-header">
-      <img
-        src="https://prometheangamescom.wordpress.com/wp-content/uploads/2025/12/logo-1.png"
-        alt="Promethean Games logo"
-        class="app-logo"
-      />
-      <div class="logo-text">
-        <h1>Watch Party</h1>
-        <p>Race to react, brag all night.</p>
+      <div class="header-left">
+        <img
+          src="https://prometheangamescom.wordpress.com/wp-content/uploads/2025/12/logo-1.png"
+          alt="Promethean Games logo"
+          class="app-logo"
+        />
+        <div class="logo-text">
+          <h1>Watch Party</h1>
+          <p>Race to react, brag all night.</p>
+          <p id="roomCodeHeader" class="room-code-text subtle"></p>
+        </div>
       </div>
+      <button id="settingsBtn" class="settings-btn" aria-label="Settings">⚙</button>
     </header>
 
     <main class="app-main">
@@ -183,6 +187,93 @@ Someone yells at the ref"></textarea>
         </div>
       </section>
     </main>
+
+    <footer class="app-footer">
+      <span id="versionFooter"></span>
+    </footer>
+
+    <!-- Tutorial overlay -->
+    <div id="tutorialOverlay" class="overlay">
+      <div class="overlay-card tutorial-card">
+        <h3>How Watch Party works</h3>
+        <div id="tutorialSlidesWrapper" class="tutorial-slides-wrapper">
+          <div class="tutorial-slides">
+            <div class="tutorial-slide active">
+              <h4>1. Pick a room & crew</h4>
+              <p>
+                Choose a room code, tap <strong>Connect</strong>, and share the code so friends can join from their own phones.
+              </p>
+              <p class="tutorial-note">Swipe left or tap Next to continue.</p>
+            </div>
+            <div class="tutorial-slide">
+              <h4>2. Load a list</h4>
+              <p>
+                Pick a preset list for live sports, TV, movies, or family chaos – or create your own events for any watch night.
+              </p>
+              <p class="tutorial-note">Everyone in the same room shares the same scoreboard.</p>
+            </div>
+            <div class="tutorial-slide">
+              <h4>3. Race to react</h4>
+              <p>
+                When an event happens on screen, tap it first to score. Anyone can <strong>veto</strong> the last tap if it was a false alarm.
+              </p>
+              <p class="tutorial-note">You can always re-open this tutorial from Settings.</p>
+            </div>
+          </div>
+        </div>
+        <div class="tutorial-dots">
+          <button class="tutorial-dot active" data-index="0"></button>
+          <button class="tutorial-dot" data-index="1"></button>
+          <button class="tutorial-dot" data-index="2"></button>
+        </div>
+        <div class="tutorial-actions">
+          <button id="tutorialSkipBtn" class="btn btn-ghost small">Skip</button>
+          <div class="tutorial-nav">
+            <button id="tutorialPrevBtn" class="btn btn-ghost small">‹</button>
+            <button id="tutorialNextBtn" class="btn btn-primary small">Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings overlay -->
+    <div id="settingsOverlay" class="overlay">
+      <div class="overlay-card settings-card">
+        <div class="settings-header">
+          <h3>Settings</h3>
+          <button id="settingsCloseBtn" class="btn-icon" aria-label="Close settings">✕</button>
+        </div>
+        <div class="settings-body">
+          <button id="settingsTutorialBtn" class="btn btn-ghost full-width">
+            View tutorial
+          </button>
+
+          <label class="field settings-field">
+            <span class="field-label">Theme</span>
+            <select id="settingsThemeSelect">
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+            </select>
+          </label>
+
+          <label class="field settings-field">
+            <span class="field-label">Right-handed mode</span>
+            <div class="field-inline">
+              <input type="checkbox" id="settingsHandToggle" />
+              <span class="subtle">Events on right, log on left</span>
+            </div>
+          </label>
+
+          <label class="field settings-field">
+            <span class="field-label">Reduce motion</span>
+            <div class="field-inline">
+              <input type="checkbox" id="settingsMotionToggle" />
+              <span class="subtle">Minimize animations and transitions</span>
+            </div>
+          </label>
+        </div>
+      </div>
+    </div>
 
     <div id="toast" class="toast"></div>
   </div>
