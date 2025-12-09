@@ -3,10 +3,8 @@ const STORAGE_KEY = "watch_party_state_v1";
 const COOLDOWN_MS = 5000;
 
 // --- Multi-device toggle ---
-// Set USE_REMOTE = true to TRY Firebase multi-device mode.
-// If Firebase isn't available, we automatically fall back to local mode.
+// We TRY to use Firebase cloud mode. If it fails, we fall back to local hotseat.
 const USE_REMOTE = true;
-const ROOM_CODE = "demo-room";
 
 // Sample starter lists
 const SAMPLE_LISTS = [
@@ -78,6 +76,7 @@ const SAMPLE_LISTS = [
 // Local state (used in both local & remote modes)
 let state = {
   hostName: "",
+  roomCode: "",         // dynamic room code, e.g. "4FG9"
   players: [],          // {id,name,emoji}
   customLists: [],      // {id,name,category,events}
   currentList: null,    // {id,source}
@@ -96,15 +95,47 @@ function generateId(prefix) {
   return prefix + "_" + Date.now() + "_" + Math.floor(Math.random() * 999999);
 }
 
+// short human room codes, e.g. "4FG9"
+function generateRoomCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // avoid confusing chars
+  let out = "";
+  for (let i = 0; i < 4; i++) {
+    out += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return out;
+}
+
+function getRoomCodeLabel() {
+  return (state.roomCode || "").trim().toUpperCase();
+}
+
+function isRemoteActive() {
+  return USE_REMOTE && remoteEnabled && !!getRoomCodeLabel();
+}
+
 function joinRemoteRoomIfNeeded() {
   if (!USE_REMOTE) {
     remoteEnabled = false;
     return;
   }
 
+  if (remoteEnabled) {
+    showToast(`Already connected to room "${getRoomCodeLabel()}".`);
+    return;
+  }
+
   if (typeof firebase === "undefined" || typeof db === "undefined") {
     console.warn("Remote mode requested but Firebase is not available. Falling back to local-only.");
     remoteEnabled = false;
+    updateModeHint();
+    return;
+  }
+
+  const rawCode = getRoomCodeLabel();
+  if (!rawCode) {
+    showToast("Enter a room code first.");
+    remoteEnabled = false;
+    updateModeHint();
     return;
   }
 
@@ -128,7 +159,7 @@ function joinRemoteRoomIfNeeded() {
       localStorage.setItem("watch_party_player_id", remotePlayerId);
     }
 
-    const roomRef = db.ref("rooms/" + ROOM_CODE);
+    const roomRef = db.ref("rooms/" + rawCode);
 
     // Add / update this player
     roomRef.child("players/" + remotePlayerId).set({
@@ -173,10 +204,13 @@ function joinRemoteRoomIfNeeded() {
     });
 
     remoteEnabled = true;
-    console.log("Remote mode enabled for room:", ROOM_CODE);
+    console.log("Remote mode enabled for room:", rawCode);
+    showToast(`Connected to cloud room "${rawCode}".`);
+    updateModeHint();
   } catch (err) {
     console.warn("Error while joining remote room, falling back to local-only.", err);
     remoteEnabled = false;
+    updateModeHint();
   }
 }
 
@@ -189,6 +223,9 @@ const screens = {
 };
 
 const hostNameInput = document.getElementById("hostNameInput");
+const roomCodeInput = document.getElementById("roomCodeInput");
+const roomConnectBtn = document.getElementById("roomConnectBtn");
+
 const playerNameInput = document.getElementById("playerNameInput");
 const playerAvatarSelect = document.getElementById("playerAvatarSelect");
 const addPlayerBtn = document.getElementById("addPlayerBtn");
@@ -246,8 +283,10 @@ function showToast(msg) {
   toastEl.textContent = msg;
   toastEl.classList.add("show");
   clearTimeout(showToast._t);
+  toastEl._visible = true;
   showToast._t = setTimeout(() => {
     toastEl.classList.remove("show");
+    toastEl._visible = false;
   }, 2100);
 }
 
@@ -273,8 +312,19 @@ function formatTime(t) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-function isRemoteActive() {
-  return USE_REMOTE && remoteEnabled;
+function updateModeHint() {
+  const hintEl = document.querySelector(".field-hint");
+  if (!hintEl) return;
+
+  if (isRemoteActive()) {
+    hintEl.textContent = `Multi-device: share this code and tap Connect on each phone to join "${getRoomCodeLabel()}".`;
+  } else if (USE_REMOTE && !remoteEnabled && getRoomCodeLabel()) {
+    hintEl.textContent = "Tap Connect to enable cloud room, or just use hotseat on this device.";
+  } else if (USE_REMOTE && !remoteEnabled) {
+    hintEl.textContent = "Choose a room code and tap Connect, or just use hotseat.";
+  } else {
+    hintEl.textContent = "Hotseat: everyone shares this device.";
+  }
 }
 
 // ------- Render: players (setup) -------
@@ -285,9 +335,9 @@ function renderPlayersList() {
     const p = document.createElement("p");
     p.className = "subtle";
     if (isRemoteActive()) {
-      p.textContent = `Multi-device: open this page on each phone to join room "${ROOM_CODE}".`;
+      p.textContent = `Multi-device: friends who join room "${getRoomCodeLabel()}" will appear here.`;
     } else if (USE_REMOTE && !remoteEnabled) {
-      p.textContent = "Cloud mode unavailable; using local hotseat. Add players below.";
+      p.textContent = "Cloud mode not active yet; add local players or tap Connect to use a room.";
     } else {
       p.textContent = "Add at least one player so we can track points.";
     }
@@ -324,15 +374,18 @@ function renderPlayersList() {
 function renderProfileSummary() {
   const count = state.players.length;
   const name = state.hostName || "No host";
+  const code = getRoomCodeLabel();
   if (!count) {
     if (isRemoteActive()) {
-      profileSummary.textContent = `${name} • room "${ROOM_CODE}" • waiting for players`;
+      profileSummary.textContent = `${name} • room "${code}" • waiting for players`;
+    } else if (code) {
+      profileSummary.textContent = `${name} • room "${code}" • no players yet`;
     } else {
       profileSummary.textContent = `${name} • no players yet`;
     }
   } else {
     if (isRemoteActive()) {
-      profileSummary.textContent = `${name} • room "${ROOM_CODE}" • ${count} player${count > 1 ? "s" : ""}`;
+      profileSummary.textContent = `${name} • room "${code}" • ${count} player${count > 1 ? "s" : ""}`;
     } else {
       profileSummary.textContent = `${name} • ${count} player${count > 1 ? "s" : ""}`;
     }
@@ -424,9 +477,9 @@ function renderPlayersChips() {
     const p = document.createElement("p");
     p.className = "subtle";
     if (isRemoteActive()) {
-      p.textContent = `Ask friends to open the same URL on their phones to join room "${ROOM_CODE}".`;
+      p.textContent = `Ask friends to join room "${getRoomCodeLabel()}" to appear here.`;
     } else if (USE_REMOTE && !remoteEnabled) {
-      p.textContent = "Cloud mode unavailable; using local hotseat. Add players on the crew screen.";
+      p.textContent = "Cloud mode not active yet; add local players on the crew screen.";
     } else {
       p.textContent = "Add players on the crew screen to start scoring.";
     }
@@ -547,10 +600,11 @@ function renderFeed() {
 
 function renderGameScreen() {
   const list = findListByRef(state.currentList);
+  const code = getRoomCodeLabel();
   if (!list) {
     nowPlayingTitle.textContent = "No list loaded";
-    nowPlayingMeta.textContent = isRemoteActive()
-      ? `Room "${ROOM_CODE}" • load a list to start.`
+    nowPlayingMeta.textContent = isRemoteActive() && code
+      ? `Room "${code}" • load a list to start.`
       : "";
   } else {
     nowPlayingTitle.textContent = list.name;
@@ -612,9 +666,9 @@ function removePlayer(id) {
 // ------- Event tap (local + remote) -------
 
 function handleEventTap(eventKey, label, el) {
-  // Remote: write tap to Firebase so all devices see it
+  // Remote: write tap to Firebase so all devices in this room see it
   if (isRemoteActive() && remotePlayerId && typeof db !== "undefined") {
-    const roomRef = db.ref("rooms/" + ROOM_CODE);
+    const roomRef = db.ref("rooms/" + getRoomCodeLabel());
     const historyRef = roomRef.child("history");
     const scoresRef = roomRef.child("scores/" + remotePlayerId);
 
@@ -690,7 +744,7 @@ function handleEventTap(eventKey, label, el) {
 
 function vetoLastTap() {
   if (isRemoteActive() && typeof db !== "undefined") {
-    const roomRef = db.ref("rooms/" + ROOM_CODE);
+    const roomRef = db.ref("rooms/" + getRoomCodeLabel());
     const historyRef = roomRef.child("history");
 
     historyRef.once("value").then((snap) => {
@@ -738,7 +792,7 @@ function resetScores() {
 
   if (isRemoteActive() && typeof db !== "undefined") {
     if (!confirm("Reset all scores for this room?")) return;
-    const roomRef = db.ref("rooms/" + ROOM_CODE);
+    const roomRef = db.ref("rooms/" + getRoomCodeLabel());
     roomRef.child("scores").set({});
     showToast("Scores reset for this room.");
     return;
@@ -789,17 +843,14 @@ function saveCustomList() {
 function initFromState() {
   hostNameInput.value = state.hostName || "";
 
-  const hintEl = document.querySelector(".field-hint");
-  if (hintEl) {
-    if (isRemoteActive()) {
-      hintEl.textContent = `Multi-device: open this page on each phone to join room "${ROOM_CODE}".`;
-    } else if (USE_REMOTE && !remoteEnabled) {
-      hintEl.textContent = "Cloud mode unavailable; using local hotseat on this device.";
-    } else {
-      hintEl.textContent = "Hotseat: everyone shares this device.";
-    }
+  // If we already have a room code stored, use it; otherwise generate one for convenience
+  if (!state.roomCode && USE_REMOTE) {
+    state.roomCode = generateRoomCode();
+    saveState();
   }
+  roomCodeInput.value = getRoomCodeLabel();
 
+  updateModeHint();
   renderPlayersList();
   renderListsScreen();
   ensureActivePlayer();
@@ -812,6 +863,25 @@ hostNameInput.addEventListener("input", () => {
   state.hostName = hostNameInput.value.trim();
   saveState();
   renderProfileSummary();
+});
+
+roomCodeInput.addEventListener("input", () => {
+  const val = (roomCodeInput.value || "").toUpperCase();
+  roomCodeInput.value = val;
+  state.roomCode = val.trim();
+  saveState();
+  updateModeHint();
+});
+
+roomConnectBtn.addEventListener("click", () => {
+  const val = (roomCodeInput.value || "").trim().toUpperCase();
+  if (!val) {
+    showToast("Enter a room code first.");
+    return;
+  }
+  state.roomCode = val;
+  saveState();
+  joinRemoteRoomIfNeeded();
 });
 
 addPlayerBtn.addEventListener("click", () => {
@@ -864,4 +934,7 @@ resetScoresBtn.addEventListener("click", resetScores);
 
 loadState();
 initFromState();
-joinRemoteRoomIfNeeded();
+// Auto-reconnect to previous room if we had one saved
+if (USE_REMOTE && getRoomCodeLabel()) {
+  joinRemoteRoomIfNeeded();
+}
