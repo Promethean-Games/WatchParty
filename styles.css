@@ -613,3 +613,227 @@ select:focus-visible {
   background: rgba(75, 85, 99, 0.9);
   border-radius: 999px;
 }
+/* Header tweaks */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: #020617;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.app-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.logo-text h1 {
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+.logo-text p {
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.room-code-text {
+  margin-top: 2px;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settings-btn {
+  border: none;
+  background: rgba(15, 23, 42, 0.9);
+  color: #e5e7eb;
+  border-radius: 999px;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+/* Footer */
+.app-footer {
+  padding: 0.5rem 1rem 1rem;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  text-align: center;
+}
+
+/* Overlays */
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.9);
+  z-index: 80;
+}
+
+.overlay.open {
+  display: flex;
+}
+
+.overlay-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-elevated, #020617);
+  border-radius: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  padding: 1rem 1.1rem 0.9rem;
+}
+
+/* Settings */
+.settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.btn-icon {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.settings-field {
+  margin-bottom: 0;
+}
+
+.field-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.full-width {
+  width: 100%;
+}
+
+/* Tutorial */
+.tutorial-card h3 {
+  margin-bottom: 0.75rem;
+}
+
+.tutorial-slides-wrapper {
+  overflow: hidden;
+}
+
+.tutorial-slides {
+  display: flex;
+}
+
+.tutorial-slide {
+  min-width: 100%;
+  flex-shrink: 0;
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.reduce-motion .tutorial-slide {
+  transition: none;
+}
+
+.tutorial-slide.active {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.tutorial-slide h4 {
+  margin: 0 0 0.3rem;
+  font-size: 1rem;
+}
+
+.tutorial-slide p {
+  margin: 0.15rem 0;
+  font-size: 0.85rem;
+}
+
+.tutorial-note {
+  margin-top: 0.4rem;
+  color: #9ca3af;
+}
+
+.tutorial-dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0.4rem;
+}
+
+.tutorial-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(148, 163, 184, 0.4);
+  padding: 0;
+}
+
+.tutorial-dot.active {
+  background: var(--accent, #facc15);
+}
+
+.tutorial-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.tutorial-nav {
+  display: flex;
+  gap: 0.4rem;
+}
+
+/* Right-handed layout: swap columns */
+.right-handed .game-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 0.75rem;
+}
+
+.right-handed .events-column {
+  order: 2;
+}
+
+.right-handed .feed-column {
+  order: 1;
+}
+
+/* Light theme override */
+body.theme-light {
+  --bg: #f3f4f6;
+  --bg-elevated: #ffffff;
+  --text: #020617;
+  --muted: #6b7280;
+  --accent: #eab308;
+  --accent-soft: rgba(234, 179, 8, 0.12);
+  --border: #d4d4d8;
+}
