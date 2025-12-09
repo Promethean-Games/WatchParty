@@ -27,15 +27,29 @@
       <section id="screen-setup" class="screen active">
         <div class="card">
           <h2>Your crew</h2>
+
           <label class="field">
             <span class="field-label">Host name</span>
             <input id="hostNameInput" type="text" maxlength="24" placeholder="e.g. Ace" />
           </label>
 
+          <label class="field">
+            <div class="field-label-row">
+              <span class="field-label">Room code</span>
+              <span class="field-hint">
+                Choose a room code and tap Connect so everyone joins the same game.
+              </span>
+            </div>
+            <div class="player-input-row">
+              <input id="roomCodeInput" type="text" maxlength="8" placeholder="e.g. 4FG9" />
+              <button id="roomConnectBtn" class="btn btn-ghost small">Connect</button>
+            </div>
+          </label>
+
           <div class="field">
             <div class="field-label-row">
               <span class="field-label">Players</span>
-              <span class="field-hint">Hotseat: everyone shares this device.</span>
+              <span class="subtle">Local hotseat: everyone can share this device.</span>
             </div>
             <div class="player-input-row">
               <input id="playerNameInput" type="text" maxlength="18" placeholder="Add player name" />
@@ -55,7 +69,7 @@
           <div class="tip-row">
             <span class="tip-icon" tabindex="0">?</span>
             <span class="tip-text">
-              Tip: tap your name before tapping an event so points go to the right player.
+              Tip: in multi-device mode, each phone is its own player. On a single phone, tap your name before tapping an event so points go to the right person.
             </span>
           </div>
 
@@ -113,7 +127,7 @@ Someone yells at the ref"></textarea>
           <div class="tip-row">
             <span class="tip-icon" tabindex="0">?</span>
             <span class="tip-text">
-              Gesture tip: tap an event when it happens on screen. We’ll handle the rest.
+              Gesture tip: tap an event when it happens on screen. We’ll handle the points and vetoes.
             </span>
           </div>
           <button id="saveListBtn" class="btn btn-primary">Save list</button>
@@ -147,7 +161,7 @@ Someone yells at the ref"></textarea>
           <div class="tip-row small">
             <span class="tip-icon" tabindex="0">?</span>
             <span class="tip-text">
-              Tap an event to claim it. We lock it for 5 seconds so nobody can spam it.
+              Tap an event to claim it. We lock it briefly so nobody can spam it.
             </span>
           </div>
         </div>
