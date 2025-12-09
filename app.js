@@ -1,3 +1,6 @@
+// --- multi-device toggle ---
+const USE_REMOTE = true;       // turn ON multi-device mode (set false to go back to local-only)
+const ROOM_CODE = "demo-room"; // all phones share this room for now
 const STORAGE_KEY = "watch_party_state_v1";
 const COOLDOWN_MS = 5000;
 
@@ -77,6 +80,87 @@ let state = {
   cooldowns: {}, // eventKey -> timestamp
   history: [] // {id,playerId,eventKey,label,time,points,vetoed}
 };
+// --- Remote (Firebase) helpers ---
+let remotePlayerId = null;
+
+// simple id generator
+function generateId(prefix) {
+  return prefix + "_" + Date.now() + "_" + Math.floor(Math.random() * 999999);
+}
+
+function joinRemoteRoomIfNeeded() {
+  // If we don't want remote or Firebase isn't loaded, do nothing
+  if (!USE_REMOTE) return;
+  if (typeof firebase === "undefined" || typeof db === "undefined") {
+    console.warn("Remote mode enabled but Firebase is not available.");
+    return;
+  }
+
+  // Ask this device for a display name (only once, then stored in localStorage)
+  let name = localStorage.getItem("watch_party_player_name") || "";
+  if (!name) {
+    name = prompt("Enter your name for this Watch Party:") || "Guest";
+    name = name.trim() || "Guest";
+    localStorage.setItem("watch_party_player_name", name);
+  }
+
+  // Random emoji for this device
+  const emojis = ["🎮", "🍿", "🏈", "🎬", "😂", "🔥", "⭐", "🎧"];
+  const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+
+  // Device-specific player id (also stored so it stays the same next time)
+  remotePlayerId = localStorage.getItem("watch_party_player_id");
+  if (!remotePlayerId) {
+    remotePlayerId = generateId("p");
+    localStorage.setItem("watch_party_player_id", remotePlayerId);
+  }
+
+  const roomRef = db.ref("rooms/" + ROOM_CODE);
+
+  // Add / update this player in the shared room
+  roomRef.child("players/" + remotePlayerId).set({
+    name,
+    emoji
+  });
+
+  // Make sure this player has a score entry
+  roomRef.child("scores/" + remotePlayerId).transaction((current) => {
+    if (current === null || current === undefined) return 0;
+    return current;
+  });
+
+  // --- Listen for shared state updates ---
+
+  // Players
+  roomRef.child("players").on("value", (snap) => {
+    const val = snap.val() || {};
+    state.players = Object.entries(val).map(([id, p]) => ({
+      id,
+      name: p.name,
+      emoji: p.emoji
+    }));
+    // In remote mode, this device always acts as itself
+    state.activePlayerId = remotePlayerId;
+    renderPlayersChips();
+    renderPlayersList && renderPlayersList(); // safe call if function exists
+  });
+
+  // Scores
+  roomRef.child("scores").on("value", (snap) => {
+    state.scores = snap.val() || {};
+    renderPlayersChips();
+  });
+
+  // History (feed)
+  roomRef.child("history").on("value", (snap) => {
+    const val = snap.val() || {};
+    state.history = Object.entries(val).map(([id, a]) => ({
+      id,
+      ...a
+    }));
+    renderFeed();
+  });
+}
 
 const screens = {
   setup: document.getElementById("screen-setup"),
@@ -479,6 +563,40 @@ function removePlayer(id) {
 }
 
 function handleEventTap(eventKey, label, el) {
+  // --- Remote mode: write to Firebase so all devices see it ---
+  if (USE_REMOTE && remotePlayerId && typeof db !== "undefined") {
+    const roomRef = db.ref("rooms/" + ROOM_CODE);
+    const historyRef = roomRef.child("history");
+    const scoresRef = roomRef.child("scores/" + remotePlayerId);
+
+    const actionId = historyRef.push().key;
+    const now = Date.now();
+    const action = {
+      playerId: remotePlayerId,
+      eventKey,
+      label,
+      time: now,
+      points: 1,
+      vetoed: false
+    };
+
+    // Add this tap to the shared history
+    historyRef.child(actionId).set(action);
+
+    // Bump this device's score
+    scoresRef.transaction((current) => (current || 0) + 1);
+
+    // Local visual feedback
+    el.classList.add("pressed");
+    setTimeout(() => {
+      el.classList.remove("pressed");
+    }, 220);
+
+    showToast("You got it!");
+    return;
+  }
+
+  // --- Local mode fallback (original single-device behavior) ---
   if (!state.players.length) {
     showToast("Add at least one player first.");
     return;
@@ -506,6 +624,23 @@ function handleEventTap(eventKey, label, el) {
   state.cooldowns[eventKey] = action.time;
   state.scores[state.activePlayerId] = (state.scores[state.activePlayerId] || 0) + 1;
   saveState();
+
+  el.classList.add("pressed", "cooling");
+  setTimeout(() => {
+    el.classList.remove("pressed");
+  }, 220);
+  setTimeout(() => {
+    if (Date.now() - state.cooldowns[eventKey] >= COOLDOWN_MS) {
+      const still = eventsList.querySelector(`.event-card[data-key="${eventKey}"]`);
+      if (still) still.classList.remove("cooling");
+    }
+  }, COOLDOWN_MS + 100);
+
+  renderPlayersChips();
+  renderFeed();
+  renderEventsList();
+};
+
 
   // Visual bump
   el.classList.add("pressed", "cooling");
@@ -641,3 +776,4 @@ resetScoresBtn.addEventListener("click", resetScores);
 // Boot
 loadState();
 initFromState();
+joinRemoteRoomIfNeeded();
