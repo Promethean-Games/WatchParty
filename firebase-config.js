@@ -17,3 +17,7 @@ firebase.initializeApp(firebaseConfig);
 
 // Realtime Database reference we use in app.js
 const db = firebase.database();
+
+// Firebase Auth reference
+const auth = firebase.auth();
+const googleProvider = new firebase.auth.GoogleAuthProvider();
