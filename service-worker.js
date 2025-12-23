@@ -1,10 +1,11 @@
-const CACHE_NAME = "watch-party-cache-v1";
+const CACHE_NAME = "watch-party-cache-v12";
 const CORE_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css",
-  "./app.js",
-  "./manifest.json"
+  "./styles.css?v=12",
+  "./app.js?v=12",
+  "./manifest.json",
+  "./firebase-config.js"
 ];
 
 self.addEventListener("install", (event) => {
