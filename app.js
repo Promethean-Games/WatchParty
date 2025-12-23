@@ -670,13 +670,16 @@ function renderOpenParties() {
     const card = document.createElement("div");
     card.className = "saved-game-card";
     
-    const topScore = Object.values(game.scores || {}).reduce((a, b) => Math.max(a, b), 0);
     const playerCount = (game.players || []).length;
+    const eventCount = (game.history || []).filter(h => !h.vetoed).length;
     
     card.innerHTML = `
+      <div class="saved-game-icon">
+        <span class="icon-text">${eventCount}</span>
+      </div>
       <div class="saved-game-info">
         <h4>${game.listName}</h4>
-        <p class="subtle">Room: ${game.roomCode} | ${playerCount} player${playerCount !== 1 ? 's' : ''} | Top: ${topScore} pts</p>
+        <p class="subtle">${playerCount} player${playerCount !== 1 ? 's' : ''} | ${eventCount} event${eventCount !== 1 ? 's' : ''} logged</p>
         <p class="subtle">${formatRelativeTime(game.savedAt)}</p>
       </div>
       <div class="saved-game-actions">
@@ -1535,6 +1538,7 @@ function handleEventTap(eventKey, label, el) {
   state.cooldowns[eventKey] = action.time;
   state.scores[state.activePlayerId] = (state.scores[state.activePlayerId] || 0) + 1;
   saveState();
+  saveCurrentGame(); // Auto-save after each event
 
   el.classList.add("pressed", "cooling");
   setTimeout(() => {
@@ -1607,20 +1611,25 @@ function resetScores() {
   if (!state.players.length) return;
 
   if (isRemoteActive() && typeof db !== "undefined") {
-    if (!confirm("Reset all scores for this room?")) return;
+    if (!confirm("Reset all scores and events for this room?")) return;
     const roomRef = db.ref("rooms/" + getRoomCodeLabel());
     roomRef.child("scores").set({});
-    showToast("Scores reset for this room.");
+    roomRef.child("history").set({});
+    showToast("Scores and events reset for this room.");
     return;
   }
 
-  if (!confirm("Reset all scores for this session?")) return;
+  if (!confirm("Reset all scores and events for this session?")) return;
   state.players.forEach((p) => {
     state.scores[p.id] = 0;
   });
+  state.history = [];
+  state.cooldowns = {};
   saveState();
   renderPlayersChips();
-  showToast("Scores reset.");
+  renderFeed();
+  renderEventsList();
+  showToast("Scores and events reset.");
 }
 
 function saveCustomList() {
