@@ -1167,14 +1167,23 @@ function buildListCard(list, source) {
   const loadBtn = document.createElement("button");
   loadBtn.className = "btn btn-primary small";
   loadBtn.textContent = "Load & play";
-  loadBtn.addEventListener("click", () => {
+  loadBtn.addEventListener("click", async () => {
     state.currentList = { id: list.id, source };
     state.cooldowns = {};
     state.history = [];
     saveState();
     renderGameScreen();
     setScreen("game");
-    // Silently loaded - no toast needed
+    
+    // Signal game started to party players
+    if (isRemoteActive()) {
+      const rawCode = getRoomCodeLabel();
+      await db.ref("rooms/" + rawCode + "/settings").update({
+        gameStarted: true,
+        currentListId: list.id,
+        currentListSource: source
+      });
+    }
   });
   actions.appendChild(loadBtn);
 
@@ -1907,10 +1916,18 @@ listsBackBtn.addEventListener("click", () => {
   setScreen("setup");
 });
 
-gameBackToListsBtn.addEventListener("click", () => {
+gameBackToListsBtn.addEventListener("click", async () => {
   setScreen("lists");
   if (state.currentList && state.history.length > 0) {
     showToast("Game saved");
+  }
+  
+  // Reset game started flag for party players
+  if (isRemoteActive()) {
+    const rawCode = getRoomCodeLabel();
+    await db.ref("rooms/" + rawCode + "/settings").update({
+      gameStarted: false
+    });
   }
 });
 
