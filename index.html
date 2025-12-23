@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#020617" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="styles.css?v=18" />
+  <link rel="stylesheet" href="styles.css?v=26" />
 </head>
 <body>
   <div id="app">
@@ -19,8 +19,6 @@
         />
         <div class="logo-text">
           <h1>Watch Party</h1>
-          <p>Race to react, brag all night.</p>
-          <p id="roomCodeHeader" class="room-code-text subtle"></p>
         </div>
       </div>
       <div class="header-right">
@@ -65,20 +63,7 @@
               </div>
             </label>
 
-            <div class="field">
-              <div class="field-label-row">
-                <span class="field-label">Players</span>
-                <span class="subtle">Add local players on this device.</span>
-              </div>
-              <div class="player-input-row">
-                <input id="playerNameInput" type="text" maxlength="18" placeholder="Add player name" />
-                <button id="playerAvatarBtn" class="btn btn-ghost avatar-picker-btn" type="button">
-                  <span id="playerAvatarPreview">🎮</span>
-                </button>
-                <button id="addPlayerBtn" class="btn btn-primary">Add</button>
-              </div>
-              <div id="playersList" class="chips-row"></div>
-            </div>
+            <div id="playersList" class="chips-row"></div>
 
             <div class="field team-mode-field">
               <div class="field-label-row">
@@ -109,7 +94,7 @@
             <div class="tip-row">
               <span class="tip-icon" tabindex="0">?</span>
               <span class="tip-text">
-                Tip: When you add a player, they're automatically selected for scoring. In Team Play mode, player scores combine into team totals.
+                Tip: Share your room code so friends can join from their phones. In Team Play mode, player scores combine into team totals.
               </span>
             </div>
 
@@ -303,18 +288,12 @@ Someone yells at the ref"></textarea>
       </section>
     </main>
 
-    <footer class="app-footer">
-      <span id="versionFooter"></span>
-    </footer>
-
     <!-- Fixed Bottom Navigation -->
     <nav id="bottomNav" class="bottom-nav">
       <button id="navSettingsBtn" class="bottom-nav-btn">
-        <span class="nav-icon">⚙</span>
         <span class="nav-label">Settings</span>
       </button>
       <button id="navPartiesBtn" class="bottom-nav-btn">
-        <span class="nav-icon">🎮</span>
         <span class="nav-label">Open Parties</span>
       </button>
     </nav>
@@ -342,7 +321,7 @@ Someone yells at the ref"></textarea>
             <div class="tutorial-slide">
               <h4>3. Race to react</h4>
               <p>
-                When an event happens on screen, tap it first to score. Anyone can <strong>veto</strong> the last tap if it was a false alarm.
+                When an event happens on screen, tap it first to score. The host can <strong>veto</strong> the last tap if it was a false alarm.
               </p>
               <p class="tutorial-note">You can always re-open this tutorial from Settings.</p>
             </div>
@@ -411,6 +390,10 @@ Someone yells at the ref"></textarea>
               <span class="subtle">Minimize animations and transitions</span>
             </div>
           </label>
+
+          <div class="settings-version">
+            <span id="versionFooter" class="subtle"></span>
+          </div>
         </div>
       </div>
     </div>
@@ -440,7 +423,7 @@ Someone yells at the ref"></textarea>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
   <script src="firebase-config.js"></script>
 
-  <script src="app.js?v=18"></script>
+  <script src="app.js?v=26"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", function () {
