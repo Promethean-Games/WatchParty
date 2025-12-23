@@ -2,6 +2,7 @@
 const VERSION = "v0.6.0";
 
 const STORAGE_KEY = "watch_party_state_v1";
+const SAVED_GAMES_KEY = "watch_party_saved_games";
 const TUTORIAL_KEY = "watch_party_tutorial_seen";
 const THEME_KEY = "watch_party_theme";
 const HAND_KEY = "watch_party_hand";
@@ -143,8 +144,12 @@ let state = {
   cooldowns: {},        // eventKey -> timestamp (local mode only)
   history: [],          // {id,playerId,eventKey,label,time,points,vetoed}
   teamMode: false,      // whether team scoring is enabled
-  rosterLocked: false   // whether team assignments are finalized
+  rosterLocked: false,  // whether team assignments are finalized
+  gamePaused: false     // whether scoring is paused (break time)
 };
+
+// Saved games storage
+let savedGames = [];
 
 // --- Remote (Firebase) helpers ---
 let remotePlayerId = null;
@@ -303,6 +308,7 @@ function joinRemoteRoomIfNeeded() {
       const settings = snap.val() || {};
       state.teamMode = settings.teamMode || false;
       state.rosterLocked = settings.rosterLocked || false;
+      state.gamePaused = settings.gamePaused || false;
       
       if (teamModeToggle) teamModeToggle.checked = state.teamMode;
       
@@ -321,6 +327,7 @@ function joinRemoteRoomIfNeeded() {
         teamModeHint.textContent = "Off: individual scores. On: Blue vs Red team scores.";
       }
       
+      updatePauseUI();
       renderTeamRoster();
       renderPlayersChips();
     });
@@ -341,8 +348,17 @@ function joinRemoteRoomIfNeeded() {
 const screens = {
   setup: document.getElementById("screen-setup"),
   lists: document.getElementById("screen-lists"),
-  game: document.getElementById("screen-game")
+  game: document.getElementById("screen-game"),
+  parties: document.getElementById("screen-parties")
 };
+
+const bottomNav = document.getElementById("bottomNav");
+const navSettingsBtn = document.getElementById("navSettingsBtn");
+const navPartiesBtn = document.getElementById("navPartiesBtn");
+const openPartiesList = document.getElementById("openPartiesList");
+const pauseGameBtn = document.getElementById("pauseGameBtn");
+const pauseBanner = document.getElementById("pauseBanner");
+const partiesBackBtn = document.getElementById("partiesBackBtn");
 
 const hostNameInput = document.getElementById("hostNameInput");
 const roomCodeInput = document.getElementById("roomCodeInput");
@@ -450,6 +466,93 @@ function saveState() {
   }
 }
 
+function loadSavedGames() {
+  try {
+    const raw = localStorage.getItem(SAVED_GAMES_KEY);
+    if (raw) {
+      savedGames = JSON.parse(raw) || [];
+    }
+  } catch (e) {
+    console.warn("Failed to load saved games", e);
+    savedGames = [];
+  }
+}
+
+function saveSavedGames() {
+  try {
+    localStorage.setItem(SAVED_GAMES_KEY, JSON.stringify(savedGames));
+  } catch (e) {
+    console.warn("Failed to save games list", e);
+  }
+}
+
+function saveCurrentGame() {
+  if (!state.currentList) return false;
+  
+  const list = findListByRef(state.currentList);
+  if (!list) return false;
+  
+  const gameId = `game_${state.roomCode}_${Date.now()}`;
+  const game = {
+    id: gameId,
+    roomCode: state.roomCode,
+    listName: list.name,
+    listRef: state.currentList,
+    players: [...state.players],
+    scores: {...state.scores},
+    history: [...state.history],
+    teamMode: state.teamMode,
+    rosterLocked: state.rosterLocked,
+    savedAt: Date.now()
+  };
+  
+  const existingIdx = savedGames.findIndex(g => g.roomCode === state.roomCode);
+  if (existingIdx >= 0) {
+    savedGames[existingIdx] = game;
+  } else {
+    savedGames.unshift(game);
+  }
+  
+  if (savedGames.length > 10) {
+    savedGames = savedGames.slice(0, 10);
+  }
+  
+  saveSavedGames();
+  return true;
+}
+
+function loadSavedGame(gameId) {
+  const game = savedGames.find(g => g.id === gameId);
+  if (!game) {
+    showToast("Game not found.");
+    return;
+  }
+  
+  state.roomCode = game.roomCode;
+  state.currentList = game.listRef;
+  state.players = game.players || [];
+  state.scores = game.scores || {};
+  state.history = game.history || [];
+  state.teamMode = game.teamMode || false;
+  state.rosterLocked = game.rosterLocked || false;
+  state.gamePaused = false;
+  
+  saveState();
+  
+  if (roomCodeInput) roomCodeInput.value = state.roomCode;
+  
+  renderPlayersList();
+  renderGameScreen();
+  setScreen("game");
+  showToast(`Resumed: ${game.listName}`);
+}
+
+function deleteSavedGame(gameId) {
+  savedGames = savedGames.filter(g => g.id !== gameId);
+  saveSavedGames();
+  renderOpenParties();
+}
+
 // ------- Utils -------
 
 function showToast(msg) {
@@ -461,10 +564,27 @@ function showToast(msg) {
   }, 2100);
 }
 
+let currentScreen = "setup";
+
 function setScreen(name) {
+  // Auto-save when leaving game screen
+  if (currentScreen === "game" && name !== "game") {
+    if (state.currentList && state.history.length > 0) {
+      saveCurrentGame();
+    }
+  }
+  
+  currentScreen = name;
+  
   Object.values(screens).forEach((s) => s.classList.remove("active"));
   const el = screens[name];
   if (el) el.classList.add("active");
+  
+  updateBottomNav(name);
+  
+  if (name === "parties") {
+    renderOpenParties();
+  }
 }
 
 function findListByRef(ref) {
@@ -481,6 +601,129 @@ function findListByRef(ref) {
 function formatTime(t) {
   const d = new Date(t);
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatRelativeTime(t) {
+  const now = Date.now();
+  const diff = now - t;
+  const mins = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  return `${days}d ago`;
+}
+
+function updateBottomNav(screenName) {
+  if (!bottomNav) return;
+  
+  bottomNav.querySelectorAll(".bottom-nav-btn").forEach(btn => {
+    btn.classList.remove("active");
+  });
+  
+  if (screenName === "parties" && navPartiesBtn) {
+    navPartiesBtn.classList.add("active");
+  }
+}
+
+function renderOpenParties() {
+  if (!openPartiesList) return;
+  
+  openPartiesList.innerHTML = "";
+  
+  if (!savedGames.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-parties";
+    empty.innerHTML = `
+      <p class="subtle">No saved games yet.</p>
+      <p class="subtle">Start a game and it will be saved automatically when you leave.</p>
+    `;
+    openPartiesList.appendChild(empty);
+    return;
+  }
+  
+  savedGames.forEach(game => {
+    const card = document.createElement("div");
+    card.className = "saved-game-card";
+    
+    const topScore = Object.values(game.scores || {}).reduce((a, b) => Math.max(a, b), 0);
+    const playerCount = (game.players || []).length;
+    
+    card.innerHTML = `
+      <div class="saved-game-info">
+        <h4>${game.listName}</h4>
+        <p class="subtle">Room: ${game.roomCode} | ${playerCount} player${playerCount !== 1 ? 's' : ''} | Top: ${topScore} pts</p>
+        <p class="subtle">${formatRelativeTime(game.savedAt)}</p>
+      </div>
+      <div class="saved-game-actions">
+        <button class="btn btn-primary small resume-btn" data-id="${game.id}">Resume</button>
+        <button class="btn btn-ghost small delete-btn" data-id="${game.id}">Delete</button>
+      </div>
+    `;
+    
+    card.querySelector(".resume-btn").addEventListener("click", () => {
+      loadSavedGame(game.id);
+    });
+    
+    card.querySelector(".delete-btn").addEventListener("click", () => {
+      if (confirm("Delete this saved game?")) {
+        deleteSavedGame(game.id);
+      }
+    });
+    
+    openPartiesList.appendChild(card);
+  });
+}
+
+function toggleGamePause() {
+  if (isRemoteActive() && !isRoomHost) {
+    showToast("Only the host can pause the game.");
+    return;
+  }
+  
+  state.gamePaused = !state.gamePaused;
+  
+  if (isRemoteActive()) {
+    const rawCode = getRoomCodeLabel();
+    db.ref("rooms/" + rawCode + "/settings/gamePaused").set(state.gamePaused);
+  }
+  
+  updatePauseUI();
+  saveState();
+  
+  if (state.gamePaused) {
+    showToast("Game paused - scoring disabled");
+  } else {
+    showToast("Game resumed - scoring enabled");
+  }
+}
+
+function updatePauseUI() {
+  if (pauseGameBtn) {
+    if (state.gamePaused) {
+      pauseGameBtn.textContent = "Resume Game";
+      pauseGameBtn.classList.add("paused");
+    } else {
+      pauseGameBtn.textContent = "Pause";
+      pauseGameBtn.classList.remove("paused");
+    }
+    
+    if (isRemoteActive() && !isRoomHost) {
+      pauseGameBtn.style.display = "none";
+    } else {
+      pauseGameBtn.style.display = "";
+    }
+  }
+  
+  if (pauseBanner) {
+    if (state.gamePaused) {
+      pauseBanner.classList.remove("hidden");
+    } else {
+      pauseBanner.classList.add("hidden");
+    }
+  }
 }
 
 // Theme & layout
@@ -1187,6 +1430,12 @@ function removePlayer(id) {
 // ------- Event tap (local + remote) -------
 
 function handleEventTap(eventKey, label, el) {
+  // Check if game is paused
+  if (state.gamePaused) {
+    showToast("Game is paused - wait for the host to resume.");
+    return;
+  }
+  
   // Check cooldown (applies to both local and remote)
   const lastTs = state.cooldowns[eventKey];
   if (lastTs && Date.now() - lastTs < COOLDOWN_MS) {
@@ -1529,6 +1778,9 @@ listsBackBtn.addEventListener("click", () => {
 
 gameBackToListsBtn.addEventListener("click", () => {
   setScreen("lists");
+  if (state.currentList && state.history.length > 0) {
+    showToast("Game saved");
+  }
 });
 
 saveListBtn.addEventListener("click", saveCustomList);
@@ -1545,6 +1797,28 @@ teamModeToggle.addEventListener("change", () => {
 });
 
 lockRosterBtn.addEventListener("click", toggleRosterLock);
+
+if (pauseGameBtn) {
+  pauseGameBtn.addEventListener("click", toggleGamePause);
+}
+
+if (navSettingsBtn) {
+  navSettingsBtn.addEventListener("click", () => {
+    settingsOverlay.classList.add("open");
+  });
+}
+
+if (navPartiesBtn) {
+  navPartiesBtn.addEventListener("click", () => {
+    setScreen("parties");
+  });
+}
+
+if (partiesBackBtn) {
+  partiesBackBtn.addEventListener("click", () => {
+    setScreen("setup");
+  });
+}
 
 // Settings UI
 settingsBtn.addEventListener("click", () => {
@@ -1725,6 +1999,7 @@ function initAuth() {
 // ------- Boot -------
 
 loadState();
+loadSavedGames();
 applySavedPreferences();
 initFromState();
 initAuth();
