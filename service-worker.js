@@ -1,9 +1,9 @@
-const CACHE_NAME = "watch-party-cache-v12";
+const CACHE_NAME = "watch-party-cache-v14";
 const CORE_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=12",
-  "./app.js?v=12",
+  "./styles.css?v=14",
+  "./app.js?v=14",
   "./manifest.json",
   "./firebase-config.js"
 ];
