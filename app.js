@@ -1,5 +1,5 @@
 // Version & keys
-const VERSION = "v0.6.0";
+const VERSION = "v0.9.6.35";
 
 const STORAGE_KEY = "watch_party_state_v1";
 const SAVED_GAMES_KEY = "watch_party_saved_games";
@@ -155,6 +155,7 @@ let savedGames = [];
 let remotePlayerId = null;
 let remoteEnabled = false; // becomes true only when Firebase is actually connected
 let isRoomHost = false; // true if this device created/first joined the room
+let roomHostId = null; // the player ID of the room host
 
 // Tutorial state
 let tutorialIndex = 0;
@@ -241,8 +242,12 @@ function joinRemoteRoomIfNeeded() {
 
     // Listen for host changes
     roomRef.child("hostId").on("value", (snap) => {
-      isRoomHost = snap.val() === remotePlayerId;
+      roomHostId = snap.val();
+      isRoomHost = roomHostId === remotePlayerId;
       updateTeamModeUI();
+      renderPlayersList();
+      renderPlayersChips();
+      renderTeamRoster();
     });
 
     roomRef.child("players/" + remotePlayerId).set({
@@ -364,10 +369,6 @@ const hostNameInput = document.getElementById("hostNameInput");
 const roomCodeInput = document.getElementById("roomCodeInput");
 const roomConnectBtn = document.getElementById("roomConnectBtn");
 
-const playerNameInput = document.getElementById("playerNameInput");
-const playerAvatarBtn = document.getElementById("playerAvatarBtn");
-const playerAvatarPreview = document.getElementById("playerAvatarPreview");
-const addPlayerBtn = document.getElementById("addPlayerBtn");
 const playersList = document.getElementById("playersList");
 const toListsBtn = document.getElementById("toListsBtn");
 
@@ -424,7 +425,6 @@ const feedList = document.getElementById("feedList");
 const vetoBtn = document.getElementById("vetoBtn");
 
 const toastEl = document.getElementById("toast");
-const roomCodeHeader = document.getElementById("roomCodeHeader");
 const versionFooter = document.getElementById("versionFooter");
 
 // Settings & tutorial DOM refs
@@ -566,7 +566,7 @@ function loadSavedGame(gameId) {
   renderPlayersList();
   renderGameScreen();
   setScreen("game");
-  showToast(`Resumed: ${game.listName}`);
+  // Silently resumed - no toast needed
 }
 
 function deleteSavedGame(gameId) {
@@ -786,19 +786,7 @@ function applyMotion(reduced) {
 }
 
 function updateRoomCodeHeader() {
-  if (!roomCodeHeader) return;
-  const code = getRoomCodeLabel();
-  if (!code) {
-    roomCodeHeader.style.display = "none";
-    roomCodeHeader.textContent = "";
-    return;
-  }
-  roomCodeHeader.style.display = "block";
-  if (isRemoteActive()) {
-    roomCodeHeader.textContent = `Room code: ${code}`;
-  } else {
-    roomCodeHeader.textContent = `Room code: ${code} (not connected)`;
-  }
+  // Room code header removed from UI
 }
 
 function updateModeHint() {
@@ -899,9 +887,11 @@ function renderPlayersList() {
     const chip = document.createElement("div");
     chip.className = "player-chip";
     chip.dataset.id = pl.id;
+    const isHostPlayer = isRemoteActive() && pl.id === roomHostId;
+    const displayName = isHostPlayer ? `${pl.name} *` : pl.name;
     chip.innerHTML = `
       <span class="emoji">${pl.emoji}</span>
-      <span>${pl.name}</span>
+      <span>${displayName}</span>
       <span class="remove" title="Remove">&times;</span>
     `;
     chip.addEventListener("click", (e) => {
@@ -911,6 +901,9 @@ function renderPlayersList() {
         } else {
           removePlayer(pl.id);
         }
+      } else if (isRemoteActive() && pl.id === remotePlayerId) {
+        // Clicking on your own chip opens avatar picker
+        openAvatarModal(null);
       } else {
         setActivePlayer(pl.id);
         setScreen("game");
@@ -1011,7 +1004,9 @@ function renderTeamRoster() {
     if (canEditTeam(pl.id)) {
       chip.classList.add("editable");
     }
-    chip.innerHTML = `<span class="emoji">${pl.emoji}</span><span>${pl.name}</span>`;
+    const isHostPlayer = isRemoteActive() && pl.id === roomHostId;
+    const displayName = isHostPlayer ? `${pl.name} *` : pl.name;
+    chip.innerHTML = `<span class="emoji">${pl.emoji}</span><span>${displayName}</span>`;
     chip.addEventListener("click", () => switchPlayerTeam(pl.id));
     blueTeamList.appendChild(chip);
   });
@@ -1022,7 +1017,9 @@ function renderTeamRoster() {
     if (canEditTeam(pl.id)) {
       chip.classList.add("editable");
     }
-    chip.innerHTML = `<span class="emoji">${pl.emoji}</span><span>${pl.name}</span>`;
+    const isHostPlayer = isRemoteActive() && pl.id === roomHostId;
+    const displayName = isHostPlayer ? `${pl.name} *` : pl.name;
+    chip.innerHTML = `<span class="emoji">${pl.emoji}</span><span>${displayName}</span>`;
     chip.addEventListener("click", () => switchPlayerTeam(pl.id));
     redTeamList.appendChild(chip);
   });
@@ -1177,7 +1174,7 @@ function buildListCard(list, source) {
     saveState();
     renderGameScreen();
     setScreen("game");
-    showToast(`Loaded: ${list.name}`);
+    // Silently loaded - no toast needed
   });
   actions.appendChild(loadBtn);
 
@@ -1275,9 +1272,11 @@ function renderPlayersChips() {
       chip.classList.add(`team-${pl.team}-indicator`);
     }
     const score = state.scores[pl.id] || 0;
+    const isHostPlayer = isRemoteActive() && pl.id === roomHostId;
+    const displayName = isHostPlayer ? `${pl.name} *` : pl.name;
     chip.innerHTML = `
       <span class="emoji">${pl.emoji}</span>
-      <span>${pl.name}</span>
+      <span>${displayName}</span>
       <span class="score">${score}</span>
     `;
     chip.addEventListener("click", () => {
@@ -1356,7 +1355,9 @@ function renderFeed() {
     li.className = "feed-item";
     if (a.vetoed) li.classList.add("vetoed");
     const pl = state.players.find((p) => p.id === a.playerId);
-    const name = pl ? pl.name : "Unknown";
+    const isHostPlayer = isRemoteActive() && a.playerId === roomHostId;
+    const baseName = pl ? pl.name : "Unknown";
+    const name = isHostPlayer ? `${baseName} *` : baseName;
     const emoji = pl ? pl.emoji : "❓";
     const main = document.createElement("div");
     main.className = "feed-main";
@@ -1716,26 +1717,6 @@ roomConnectBtn.addEventListener("click", () => {
   joinRemoteRoomIfNeeded();
 });
 
-addPlayerBtn.addEventListener("click", () => {
-  if (isRemoteActive()) {
-    showToast("In multi-device mode, each phone is its own player. Just open this page on each device.");
-    return;
-  }
-  addPlayer(playerNameInput.value, selectedAvatar);
-  playerNameInput.value = "";
-  playerNameInput.focus();
-});
-
-playerNameInput.addEventListener("keypress", (e) => {
-  if (e.key === "Enter") {
-    if (isRemoteActive()) {
-      showToast("In multi-device mode, each phone is its own player.");
-      return;
-    }
-    addPlayer(playerNameInput.value, selectedAvatar);
-    playerNameInput.value = "";
-  }
-});
 
 // Avatar modal functions
 let currentAvatarTarget = null;
@@ -1777,11 +1758,10 @@ function saveAvatarSelection() {
     }
     
     // Update all avatar previews
-    if (playerAvatarPreview) playerAvatarPreview.textContent = selectedAvatar;
     if (partyAvatarPreview) partyAvatarPreview.textContent = selectedAvatar;
     if (selectedAvatarPreview) selectedAvatarPreview.textContent = selectedAvatar;
     
-    // If in remote mode, update Firebase
+    // If in remote mode, update Firebase and re-render
     if (isRemoteActive() && remotePlayerId) {
       const rawCode = getRoomCodeLabel();
       db.ref("rooms/" + rawCode + "/players/" + remotePlayerId + "/emoji").set(selectedAvatar);
@@ -1794,9 +1774,6 @@ function saveAvatarSelection() {
 // Avatar button listeners
 if (chooseAvatarBtn) {
   chooseAvatarBtn.addEventListener("click", () => openAvatarModal(selectedAvatarPreview));
-}
-if (playerAvatarBtn) {
-  playerAvatarBtn.addEventListener("click", () => openAvatarModal(playerAvatarPreview));
 }
 if (partyAvatarBtn) {
   partyAvatarBtn.addEventListener("click", () => openAvatarModal(partyAvatarPreview));
