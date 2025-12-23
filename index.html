@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#020617" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=12" />
 </head>
 <body>
   <div id="app">
@@ -23,7 +23,14 @@
           <p id="roomCodeHeader" class="room-code-text subtle"></p>
         </div>
       </div>
-      <button id="settingsBtn" class="settings-btn" aria-label="Settings">⚙</button>
+      <div class="header-right">
+        <div id="userInfo" class="user-info hidden">
+          <img id="userAvatar" class="user-avatar" alt="User avatar" />
+          <span id="userName" class="user-name"></span>
+        </div>
+        <button id="googleSignInBtn" class="btn btn-ghost small hidden">Sign in with Google</button>
+        <button id="settingsBtn" class="settings-btn" aria-label="Settings">⚙</button>
+      </div>
     </header>
 
     <main class="app-main">
@@ -53,27 +60,48 @@
           <div class="field">
             <div class="field-label-row">
               <span class="field-label">Players</span>
-              <span class="subtle">Local hotseat: everyone can share this device.</span>
+              <span class="subtle">Add players who will compete in this room.</span>
             </div>
             <div class="player-input-row">
               <input id="playerNameInput" type="text" maxlength="18" placeholder="Add player name" />
-              <select id="playerAvatarSelect">
-                <option>🎮</option>
-                <option>🍿</option>
-                <option>🏈</option>
-                <option>🎬</option>
-                <option>😂</option>
-                <option>🔥</option>
-              </select>
+              <button id="chooseAvatarBtn" class="btn btn-ghost avatar-btn" type="button">
+                <span id="selectedAvatarPreview">🎮</span>
+              </button>
               <button id="addPlayerBtn" class="btn btn-primary">Add</button>
             </div>
             <div id="playersList" class="chips-row"></div>
           </div>
 
+          <div class="field team-mode-field">
+            <div class="field-label-row">
+              <span class="field-label">Team Play</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="teamModeToggle" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <span class="subtle" id="teamModeHint">Off: individual scores. On: Blue vs Red team scores.</span>
+          </div>
+
+          <div id="teamRosterSection" class="team-roster-section hidden">
+            <div class="team-columns">
+              <div class="team-column team-blue">
+                <h4>Blue Team</h4>
+                <div id="blueTeamList" class="team-player-list"></div>
+              </div>
+              <div class="team-column team-red">
+                <h4>Red Team</h4>
+                <div id="redTeamList" class="team-player-list"></div>
+              </div>
+            </div>
+            <p class="subtle team-switch-hint">Tap a player to switch teams before locking the roster.</p>
+            <button id="lockRosterBtn" class="btn btn-ghost small">Lock Roster</button>
+          </div>
+
           <div class="tip-row">
             <span class="tip-icon" tabindex="0">?</span>
             <span class="tip-text">
-              Tip: in multi-device mode, each phone is its own player. On a single phone, tap your name before tapping an event so points go to the right person.
+              Tip: When you add a player, they're automatically selected for scoring. In Team Play mode, player scores combine into team totals.
             </span>
           </div>
 
@@ -244,6 +272,15 @@ Someone yells at the ref"></textarea>
           <button id="settingsCloseBtn" class="btn-icon" aria-label="Close settings">✕</button>
         </div>
         <div class="settings-body">
+          <div id="settingsAuthSection" class="settings-auth-section">
+            <div id="settingsUserInfo" class="settings-user-info hidden">
+              <img id="settingsUserAvatar" class="settings-user-avatar" alt="User avatar" />
+              <span id="settingsUserName" class="settings-user-name"></span>
+            </div>
+            <button id="settingsSignInBtn" class="btn btn-primary full-width hidden">Sign in with Google</button>
+            <button id="settingsSignOutBtn" class="btn btn-ghost full-width hidden">Sign out</button>
+          </div>
+
           <button id="settingsTutorialBtn" class="btn btn-ghost full-width">
             View tutorial
           </button>
@@ -276,14 +313,31 @@ Someone yells at the ref"></textarea>
     </div>
 
     <div id="toast" class="toast"></div>
+
+    <!-- Avatar Picker Modal -->
+    <div id="avatarModal" class="modal-overlay">
+      <div class="modal-panel avatar-modal">
+        <div class="modal-header">
+          <h3>Choose your Avatar</h3>
+          <button id="avatarModalCloseBtn" class="btn-icon" aria-label="Close">✕</button>
+        </div>
+        <div class="avatar-grid-container">
+          <div id="avatarGrid" class="avatar-grid"></div>
+        </div>
+        <div class="modal-footer">
+          <button id="avatarSaveBtn" class="btn btn-primary full-width">Save</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Firebase SDKs (must be before app.js) -->
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
   <script src="firebase-config.js"></script>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=12"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", function () {
