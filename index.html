@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#020617" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="styles.css?v=14" />
+  <link rel="stylesheet" href="styles.css?v=18" />
 </head>
 <body>
   <div id="app">
@@ -36,78 +36,136 @@
     <main class="app-main">
       <!-- Screen: Setup / Players -->
       <section id="screen-setup" class="screen active">
-        <div class="card">
-          <h2>Your crew</h2>
+        <!-- Host/Party Tab Navigation -->
+        <div class="setup-tabs">
+          <button id="hostTabBtn" class="setup-tab active">Host</button>
+          <button id="partyTabBtn" class="setup-tab">Party</button>
+        </div>
 
-          <label class="field">
-            <span class="field-label">Host name</span>
-            <div class="host-input-row">
+        <!-- Host Panel -->
+        <div id="hostPanel" class="setup-panel active">
+          <div class="card">
+            <h2>Host Setup</h2>
+
+            <label class="field">
+              <span class="field-label">Host name</span>
               <input id="hostNameInput" type="text" maxlength="24" placeholder="e.g. Ace" />
-              <button id="chooseAvatarBtn" class="btn btn-ghost" type="button">
-                <span id="selectedAvatarPreview">🎮</span> Avatar
-              </button>
-            </div>
-          </label>
+            </label>
 
-          <label class="field">
-            <div class="field-label-row">
-              <span class="field-label">Room code</span>
-              <span class="field-hint">
-                Choose a room code and tap Connect so everyone joins the same game.
+            <label class="field">
+              <div class="field-label-row">
+                <span class="field-label">Room code</span>
+                <span class="field-hint">
+                  Share this code so friends can join from their phones.
+                </span>
+              </div>
+              <div class="player-input-row">
+                <input id="roomCodeInput" type="text" maxlength="8" placeholder="e.g. 4FG9" />
+                <button id="roomConnectBtn" class="btn btn-ghost small">Connect</button>
+              </div>
+            </label>
+
+            <div class="field">
+              <div class="field-label-row">
+                <span class="field-label">Players</span>
+                <span class="subtle">Add local players on this device.</span>
+              </div>
+              <div class="player-input-row">
+                <input id="playerNameInput" type="text" maxlength="18" placeholder="Add player name" />
+                <button id="playerAvatarBtn" class="btn btn-ghost avatar-picker-btn" type="button">
+                  <span id="playerAvatarPreview">🎮</span>
+                </button>
+                <button id="addPlayerBtn" class="btn btn-primary">Add</button>
+              </div>
+              <div id="playersList" class="chips-row"></div>
+            </div>
+
+            <div class="field team-mode-field">
+              <div class="field-label-row">
+                <span class="field-label">Team Play</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="teamModeToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <span class="subtle" id="teamModeHint">Off: individual scores. On: Blue vs Red team scores.</span>
+            </div>
+
+            <div id="teamRosterSection" class="team-roster-section hidden">
+              <div class="team-columns">
+                <div class="team-column team-blue">
+                  <h4>Blue Team</h4>
+                  <div id="blueTeamList" class="team-player-list"></div>
+                </div>
+                <div class="team-column team-red">
+                  <h4>Red Team</h4>
+                  <div id="redTeamList" class="team-player-list"></div>
+                </div>
+              </div>
+              <p class="subtle team-switch-hint">Tap a player to switch teams before locking the roster.</p>
+              <button id="lockRosterBtn" class="btn btn-ghost small">Lock Roster</button>
+            </div>
+
+            <div class="tip-row">
+              <span class="tip-icon" tabindex="0">?</span>
+              <span class="tip-text">
+                Tip: When you add a player, they're automatically selected for scoring. In Team Play mode, player scores combine into team totals.
               </span>
             </div>
-            <div class="player-input-row">
-              <input id="roomCodeInput" type="text" maxlength="8" placeholder="e.g. 4FG9" />
-              <button id="roomConnectBtn" class="btn btn-ghost small">Connect</button>
-            </div>
-          </label>
 
-          <div class="field">
-            <div class="field-label-row">
-              <span class="field-label">Players</span>
-              <span class="subtle">Add players who will compete in this room.</span>
-            </div>
-            <div class="player-input-row">
-              <input id="playerNameInput" type="text" maxlength="18" placeholder="Add player name" />
-              <button id="addPlayerBtn" class="btn btn-primary">Add</button>
-            </div>
-            <div id="playersList" class="chips-row"></div>
+            <button id="toListsBtn" class="btn btn-cta">Save &amp; pick a list</button>
           </div>
+        </div>
 
-          <div class="field team-mode-field">
-            <div class="field-label-row">
-              <span class="field-label">Team Play</span>
-              <label class="toggle-switch">
-                <input type="checkbox" id="teamModeToggle" />
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
-            <span class="subtle" id="teamModeHint">Off: individual scores. On: Blue vs Red team scores.</span>
-          </div>
+        <!-- Party Panel (for joining players) -->
+        <div id="partyPanel" class="setup-panel">
+          <div class="card">
+            <h2>Join Party</h2>
 
-          <div id="teamRosterSection" class="team-roster-section hidden">
-            <div class="team-columns">
-              <div class="team-column team-blue">
-                <h4>Blue Team</h4>
-                <div id="blueTeamList" class="team-player-list"></div>
+            <label class="field">
+              <div class="field-label-row">
+                <span class="field-label">Room code</span>
+                <span class="field-hint">
+                  Enter the code shared by your host.
+                </span>
               </div>
-              <div class="team-column team-red">
-                <h4>Red Team</h4>
-                <div id="redTeamList" class="team-player-list"></div>
+              <div class="player-input-row">
+                <input id="partyRoomCodeInput" type="text" maxlength="8" placeholder="e.g. 4FG9" />
+                <button id="partyConnectBtn" class="btn btn-ghost small">Join</button>
+              </div>
+            </label>
+
+            <label class="field">
+              <span class="field-label">Your name</span>
+              <div class="player-input-row">
+                <input id="partyPlayerNameInput" type="text" maxlength="18" placeholder="Enter your name" />
+                <button id="partyAvatarBtn" class="btn btn-ghost avatar-picker-btn" type="button">
+                  <span id="partyAvatarPreview">🎮</span>
+                </button>
+              </div>
+            </label>
+
+            <div id="partyTeamSection" class="party-team-section hidden">
+              <div class="field-label-row">
+                <span class="field-label">Your Team</span>
+              </div>
+              <div class="team-picker">
+                <button id="partyBlueTeamBtn" class="btn btn-ghost team-btn blue">Blue Team</button>
+                <button id="partyRedTeamBtn" class="btn btn-ghost team-btn red">Red Team</button>
               </div>
             </div>
-            <p class="subtle team-switch-hint">Tap a player to switch teams before locking the roster.</p>
-            <button id="lockRosterBtn" class="btn btn-ghost small">Lock Roster</button>
+
+            <button id="partyReadyBtn" class="btn btn-cta">Ready!</button>
           </div>
 
-          <div class="tip-row">
-            <span class="tip-icon" tabindex="0">?</span>
-            <span class="tip-text">
-              Tip: When you add a player, they're automatically selected for scoring. In Team Play mode, player scores combine into team totals.
-            </span>
+          <!-- Waiting Room -->
+          <div id="waitingRoom" class="waiting-room hidden">
+            <div class="waiting-content">
+              <div class="spinner"></div>
+              <p class="waiting-text">Waiting on host...</p>
+              <p class="waiting-hint subtle">The host is picking a list. Hang tight!</p>
+            </div>
           </div>
-
-          <button id="toListsBtn" class="btn btn-cta">Save &amp; pick a list</button>
         </div>
       </section>
 
@@ -326,6 +384,10 @@ Someone yells at the ref"></textarea>
             View tutorial
           </button>
 
+          <button id="chooseAvatarBtn" class="btn btn-ghost full-width">
+            <span id="selectedAvatarPreview">🎮</span> Choose your Avatar
+          </button>
+
           <label class="field settings-field">
             <span class="field-label">Theme</span>
             <select id="settingsThemeSelect">
@@ -378,7 +440,7 @@ Someone yells at the ref"></textarea>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
   <script src="firebase-config.js"></script>
 
-  <script src="app.js?v=14"></script>
+  <script src="app.js?v=18"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", function () {
