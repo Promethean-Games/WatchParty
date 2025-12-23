@@ -135,18 +135,21 @@ const SAMPLE_LISTS = [
 let state = {
   hostName: "",
   roomCode: "",
-  players: [],          // {id,name,emoji}
+  players: [],          // {id,name,emoji,team} - team can be null, "blue", or "red"
   customLists: [],      // {id,name,category,events}
   currentList: null,    // {id,source}
   activePlayerId: null,
   scores: {},           // playerId -> number
   cooldowns: {},        // eventKey -> timestamp (local mode only)
-  history: []           // {id,playerId,eventKey,label,time,points,vetoed}
+  history: [],          // {id,playerId,eventKey,label,time,points,vetoed}
+  teamMode: false,      // whether team scoring is enabled
+  rosterLocked: false   // whether team assignments are finalized
 };
 
 // --- Remote (Firebase) helpers ---
 let remotePlayerId = null;
 let remoteEnabled = false; // becomes true only when Firebase is actually connected
+let isRoomHost = false; // true if this device created/first joined the room
 
 // Tutorial state
 let tutorialIndex = 0;
@@ -210,8 +213,7 @@ function joinRemoteRoomIfNeeded() {
       localStorage.setItem("watch_party_player_name", name);
     }
 
-    const emojis = ["🎮", "🍿", "🏈", "🎬", "😂", "🔥", "⭐", "🎧"];
-    const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+    const emoji = ALL_EMOJIS[Math.floor(Math.random() * ALL_EMOJIS.length)];
 
     remotePlayerId = localStorage.getItem("watch_party_player_id");
     if (!remotePlayerId) {
@@ -221,9 +223,27 @@ function joinRemoteRoomIfNeeded() {
 
     const roomRef = db.ref("rooms/" + rawCode);
 
+    // Set up host tracking - first player becomes host
+    roomRef.child("hostId").transaction((currentHost) => {
+      if (currentHost === null) {
+        return remotePlayerId;
+      }
+      return currentHost;
+    }).then((result) => {
+      isRoomHost = result.snapshot.val() === remotePlayerId;
+      updateTeamModeUI();
+    });
+
+    // Listen for host changes
+    roomRef.child("hostId").on("value", (snap) => {
+      isRoomHost = snap.val() === remotePlayerId;
+      updateTeamModeUI();
+    });
+
     roomRef.child("players/" + remotePlayerId).set({
       name,
-      emoji
+      emoji,
+      team: null
     });
 
     roomRef.child("scores/" + remotePlayerId).transaction((current) => {
@@ -231,17 +251,37 @@ function joinRemoteRoomIfNeeded() {
       return current;
     });
 
+    // Listen for player changes (including team assignments)
     roomRef.child("players").on("value", (snap) => {
       const val = snap.val() || {};
       state.players = Object.entries(val).map(([id, p]) => ({
         id,
         name: p.name,
-        emoji: p.emoji
+        emoji: p.emoji,
+        team: p.team || null
       }));
       state.activePlayerId = remotePlayerId;
+      
+      // Host auto-assigns teams to new players when Team Play is active
+      if (isRoomHost && state.teamMode && !state.rosterLocked) {
+        const playersWithoutTeam = state.players.filter(p => !p.team);
+        if (playersWithoutTeam.length > 0) {
+          let blueCount = state.players.filter(p => p.team === "blue").length;
+          let redCount = state.players.filter(p => p.team === "red").length;
+          
+          playersWithoutTeam.forEach(pl => {
+            const assignTeam = blueCount <= redCount ? "blue" : "red";
+            roomRef.child("players/" + pl.id + "/team").set(assignTeam);
+            if (assignTeam === "blue") blueCount++;
+            else redCount++;
+          });
+        }
+      }
+      
       renderPlayersChips();
       renderPlayersList();
       renderProfileSummary();
+      renderTeamRoster();
     });
 
     roomRef.child("scores").on("value", (snap) => {
@@ -256,6 +296,33 @@ function joinRemoteRoomIfNeeded() {
         ...a
       }));
       renderFeed();
+    });
+
+    // Listen for team settings changes
+    roomRef.child("settings").on("value", (snap) => {
+      const settings = snap.val() || {};
+      state.teamMode = settings.teamMode || false;
+      state.rosterLocked = settings.rosterLocked || false;
+      
+      if (teamModeToggle) teamModeToggle.checked = state.teamMode;
+      
+      if (state.teamMode) {
+        teamRosterSection.classList.remove("hidden");
+        teamModeHint.textContent = "Blue vs Red: player scores combine into team totals.";
+        if (state.rosterLocked) {
+          teamRosterSection.classList.add("roster-locked");
+          lockRosterBtn.textContent = "Unlock Roster";
+        } else {
+          teamRosterSection.classList.remove("roster-locked");
+          lockRosterBtn.textContent = "Lock Roster";
+        }
+      } else {
+        teamRosterSection.classList.add("hidden");
+        teamModeHint.textContent = "Off: individual scores. On: Blue vs Red team scores.";
+      }
+      
+      renderTeamRoster();
+      renderPlayersChips();
     });
 
     remoteEnabled = true;
@@ -282,10 +349,21 @@ const roomCodeInput = document.getElementById("roomCodeInput");
 const roomConnectBtn = document.getElementById("roomConnectBtn");
 
 const playerNameInput = document.getElementById("playerNameInput");
-const playerAvatarSelect = document.getElementById("playerAvatarSelect");
+const chooseAvatarBtn = document.getElementById("chooseAvatarBtn");
+const selectedAvatarPreview = document.getElementById("selectedAvatarPreview");
 const addPlayerBtn = document.getElementById("addPlayerBtn");
 const playersList = document.getElementById("playersList");
 const toListsBtn = document.getElementById("toListsBtn");
+
+// Avatar modal refs
+const avatarModal = document.getElementById("avatarModal");
+const avatarGrid = document.getElementById("avatarGrid");
+const avatarModalCloseBtn = document.getElementById("avatarModalCloseBtn");
+const avatarSaveBtn = document.getElementById("avatarSaveBtn");
+
+// All available emojis
+const ALL_EMOJIS = ["🎮", "🍿", "🏈", "🎬", "😂", "🔥", "⭐", "🎧", "😺", "🦴", "🐕", "💅", "🦾", "💝", "💕", "💔", "👽", "🤖", "👾", "🫠", "😇", "😘", "🫣", "🤐", "🫥", "🤥", "😴", "🤒", "🤯", "🤠", "🥳", "🥸", "😭", "😱", "🦍", "🦝", "💤"];
+let selectedAvatar = "🎮";
 
 const profileSummary = document.getElementById("profileSummary");
 const sampleListsEl = document.getElementById("sampleLists");
@@ -327,6 +405,27 @@ const tutorialDots = document.querySelectorAll(".tutorial-dot");
 const tutorialPrevBtn = document.getElementById("tutorialPrevBtn");
 const tutorialNextBtn = document.getElementById("tutorialNextBtn");
 const tutorialSkipBtn = document.getElementById("tutorialSkipBtn");
+
+// Auth DOM refs
+const googleSignInBtn = document.getElementById("googleSignInBtn");
+const userInfoEl = document.getElementById("userInfo");
+const userAvatarEl = document.getElementById("userAvatar");
+const userNameEl = document.getElementById("userName");
+const settingsUserInfo = document.getElementById("settingsUserInfo");
+const settingsUserAvatar = document.getElementById("settingsUserAvatar");
+
+const teamModeToggle = document.getElementById("teamModeToggle");
+const teamModeHint = document.getElementById("teamModeHint");
+const teamRosterSection = document.getElementById("teamRosterSection");
+const blueTeamList = document.getElementById("blueTeamList");
+const redTeamList = document.getElementById("redTeamList");
+const lockRosterBtn = document.getElementById("lockRosterBtn");
+const settingsUserName = document.getElementById("settingsUserName");
+const settingsSignInBtn = document.getElementById("settingsSignInBtn");
+const settingsSignOutBtn = document.getElementById("settingsSignOutBtn");
+
+// Current user state
+let currentUser = null;
 
 // ------- Storage helpers -------
 
@@ -447,11 +546,11 @@ function updateModeHint() {
   if (isRemoteActive()) {
     hintEl.textContent = `Multi-device: share this code and tap Connect on each phone to join "${getRoomCodeLabel()}".`;
   } else if (USE_REMOTE && !remoteEnabled && getRoomCodeLabel()) {
-    hintEl.textContent = "Tap Connect to enable cloud room, or just use hotseat on this device.";
+    hintEl.textContent = "Tap Connect to sync with other devices in this room.";
   } else if (USE_REMOTE && !remoteEnabled) {
-    hintEl.textContent = "Choose a room code and tap Connect, or just use hotseat.";
+    hintEl.textContent = "Choose a room code and tap Connect to play with others.";
   } else {
-    hintEl.textContent = "Hotseat: everyone shares this device.";
+    hintEl.textContent = "Enter a room code and tap Connect to start.";
   }
 
   updateRoomCodeHeader();
@@ -524,7 +623,7 @@ function renderPlayersList() {
     if (isRemoteActive()) {
       p.textContent = `Multi-device: friends who join room "${getRoomCodeLabel()}" will appear here.`;
     } else if (USE_REMOTE && !remoteEnabled) {
-      p.textContent = "Cloud mode not active yet; add local players or tap Connect to use a room.";
+      p.textContent = "Tap Connect to join a room and start playing.";
     } else {
       p.textContent = "Add at least one player so we can track points.";
     }
@@ -554,6 +653,213 @@ function renderPlayersList() {
     });
     playersList.appendChild(chip);
   });
+}
+
+// ------- Team Mode Functions -------
+
+function updateTeamModeUI() {
+  if (!teamModeToggle || !lockRosterBtn) return;
+  
+  if (isRemoteActive() && !isRoomHost) {
+    teamModeToggle.disabled = true;
+    lockRosterBtn.disabled = true;
+    teamModeHint.textContent = state.teamMode 
+      ? "Blue vs Red mode (host controls settings)."
+      : "Off: individual scores. Host can enable Team Play.";
+  } else {
+    teamModeToggle.disabled = false;
+    lockRosterBtn.disabled = false;
+  }
+}
+
+function toggleTeamMode(enabled) {
+  // In remote mode, only host can toggle
+  if (isRemoteActive() && !isRoomHost) {
+    showToast("Only the host can change Team Play settings.");
+    if (teamModeToggle) teamModeToggle.checked = state.teamMode;
+    return;
+  }
+  
+  state.teamMode = enabled;
+  state.rosterLocked = false;
+  
+  if (isRemoteActive()) {
+    // Write settings to Firebase
+    const rawCode = getRoomCodeLabel();
+    const roomRef = db.ref("rooms/" + rawCode);
+    roomRef.child("settings").set({
+      teamMode: enabled,
+      rosterLocked: false
+    });
+    
+    // Auto-assign teams and write to Firebase
+    if (enabled) {
+      state.players.forEach((pl, idx) => {
+        if (!pl.team) {
+          const newTeam = idx % 2 === 0 ? "blue" : "red";
+          roomRef.child("players/" + pl.id + "/team").set(newTeam);
+        }
+      });
+    } else {
+      state.players.forEach((pl) => {
+        roomRef.child("players/" + pl.id + "/team").set(null);
+      });
+    }
+  } else {
+    // Local mode behavior
+    if (enabled) {
+      teamRosterSection.classList.remove("hidden");
+      teamRosterSection.classList.remove("roster-locked");
+      teamModeHint.textContent = "Blue vs Red: player scores combine into team totals.";
+      state.players.forEach((pl, idx) => {
+        if (!pl.team) {
+          pl.team = idx % 2 === 0 ? "blue" : "red";
+        }
+      });
+    } else {
+      teamRosterSection.classList.add("hidden");
+      teamModeHint.textContent = "Off: individual scores. On: Blue vs Red team scores.";
+      state.players.forEach((pl) => {
+        pl.team = null;
+      });
+    }
+    
+    saveState();
+    renderTeamRoster();
+    renderPlayersList();
+    renderPlayersChips();
+  }
+}
+
+function renderTeamRoster() {
+  if (!blueTeamList || !redTeamList) return;
+  
+  blueTeamList.innerHTML = "";
+  redTeamList.innerHTML = "";
+  
+  const bluePlayers = state.players.filter(p => p.team === "blue");
+  const redPlayers = state.players.filter(p => p.team === "red");
+  
+  bluePlayers.forEach(pl => {
+    const chip = document.createElement("div");
+    chip.className = "team-player-chip";
+    if (canEditTeam(pl.id)) {
+      chip.classList.add("editable");
+    }
+    chip.innerHTML = `<span class="emoji">${pl.emoji}</span><span>${pl.name}</span>`;
+    chip.addEventListener("click", () => switchPlayerTeam(pl.id));
+    blueTeamList.appendChild(chip);
+  });
+  
+  redPlayers.forEach(pl => {
+    const chip = document.createElement("div");
+    chip.className = "team-player-chip";
+    if (canEditTeam(pl.id)) {
+      chip.classList.add("editable");
+    }
+    chip.innerHTML = `<span class="emoji">${pl.emoji}</span><span>${pl.name}</span>`;
+    chip.addEventListener("click", () => switchPlayerTeam(pl.id));
+    redTeamList.appendChild(chip);
+  });
+  
+  if (!bluePlayers.length) {
+    blueTeamList.innerHTML = '<p class="subtle" style="font-size:0.75rem;margin:0;">No players</p>';
+  }
+  if (!redPlayers.length) {
+    redTeamList.innerHTML = '<p class="subtle" style="font-size:0.75rem;margin:0;">No players</p>';
+  }
+  
+  // Update hint text based on context
+  const hintEl = document.querySelector(".team-switch-hint");
+  if (hintEl) {
+    if (state.rosterLocked) {
+      hintEl.textContent = "Roster is locked. Host can unlock to allow team changes.";
+    } else if (isRemoteActive() && !isRoomHost) {
+      hintEl.textContent = "Tap your name to switch teams.";
+    } else {
+      hintEl.textContent = "Tap a player to switch teams before locking the roster.";
+    }
+  }
+}
+
+function canEditTeam(playerId) {
+  if (state.rosterLocked) return false;
+  if (!isRemoteActive()) return true;
+  if (isRoomHost) return true;
+  return playerId === remotePlayerId;
+}
+
+function switchPlayerTeam(playerId) {
+  if (state.rosterLocked) {
+    showToast("Roster is locked. Ask the host to unlock.");
+    return;
+  }
+  
+  if (!canEditTeam(playerId)) {
+    showToast("You can only switch your own team.");
+    return;
+  }
+  
+  const player = state.players.find(p => p.id === playerId);
+  if (!player) return;
+  
+  const newTeam = player.team === "blue" ? "red" : "blue";
+  
+  if (isRemoteActive()) {
+    const rawCode = getRoomCodeLabel();
+    db.ref("rooms/" + rawCode + "/players/" + playerId + "/team").set(newTeam);
+  } else {
+    player.team = newTeam;
+    saveState();
+    renderTeamRoster();
+    renderPlayersList();
+  }
+  
+  showToast(`${player.name} moved to ${newTeam === "blue" ? "Blue" : "Red"} Team`);
+}
+
+function toggleRosterLock() {
+  // In remote mode, only host can lock/unlock roster
+  if (isRemoteActive() && !isRoomHost) {
+    showToast("Only the host can lock/unlock the roster.");
+    return;
+  }
+  
+  const newLocked = !state.rosterLocked;
+  
+  if (isRemoteActive()) {
+    const rawCode = getRoomCodeLabel();
+    db.ref("rooms/" + rawCode + "/settings/rosterLocked").set(newLocked);
+  } else {
+    state.rosterLocked = newLocked;
+    if (state.rosterLocked) {
+      teamRosterSection.classList.add("roster-locked");
+      lockRosterBtn.textContent = "Unlock Roster";
+    } else {
+      teamRosterSection.classList.remove("roster-locked");
+      lockRosterBtn.textContent = "Lock Roster";
+    }
+    saveState();
+    renderTeamRoster();
+  }
+  
+  showToast(newLocked ? "Roster locked! Teams are set." : "Roster unlocked. You can switch teams.");
+}
+
+function getTeamScores() {
+  let blueScore = 0;
+  let redScore = 0;
+  
+  state.players.forEach(pl => {
+    const score = state.scores[pl.id] || 0;
+    if (pl.team === "blue") {
+      blueScore += score;
+    } else if (pl.team === "red") {
+      redScore += score;
+    }
+  });
+  
+  return { blue: blueScore, red: redScore };
 }
 
 // ------- Render: profile summary -------
@@ -658,19 +964,41 @@ function renderListsScreen() {
 
 function renderPlayersChips() {
   playersChips.innerHTML = "";
+  
+  if (state.teamMode && state.players.length) {
+    const teamScores = getTeamScores();
+    const teamBar = document.createElement("div");
+    teamBar.className = "team-scores-bar";
+    teamBar.innerHTML = `
+      <div class="team-score-card blue">
+        <span>Blue Team</span>
+        <span class="team-score-value">${teamScores.blue}</span>
+      </div>
+      <div class="team-score-card red">
+        <span>Red Team</span>
+        <span class="team-score-value">${teamScores.red}</span>
+      </div>
+    `;
+    playersChips.appendChild(teamBar);
+  }
+  
   if (!state.players.length) {
     const p = document.createElement("p");
     p.className = "subtle";
     if (isRemoteActive()) {
       p.textContent = `Ask friends to join room "${getRoomCodeLabel()}" to appear here.`;
     } else if (USE_REMOTE && !remoteEnabled) {
-      p.textContent = "Cloud mode not active yet; add local players on the crew screen.";
+      p.textContent = "Tap Connect to join a room, then add players on the crew screen.";
     } else {
       p.textContent = "Add players on the crew screen to start scoring.";
     }
     playersChips.appendChild(p);
     return;
   }
+  
+  const chipsContainer = document.createElement("div");
+  chipsContainer.className = "chips-row";
+  
   state.players.forEach((pl) => {
     const chip = document.createElement("button");
     chip.type = "button";
@@ -678,6 +1006,9 @@ function renderPlayersChips() {
     chip.dataset.id = pl.id;
     const isActive = pl.id === state.activePlayerId;
     if (isActive) chip.classList.add("active");
+    if (state.teamMode && pl.team) {
+      chip.classList.add(`team-${pl.team}-indicator`);
+    }
     const score = state.scores[pl.id] || 0;
     chip.innerHTML = `
       <span class="emoji">${pl.emoji}</span>
@@ -687,8 +1018,10 @@ function renderPlayersChips() {
     chip.addEventListener("click", () => {
       setActivePlayer(pl.id);
     });
-    playersChips.appendChild(chip);
+    chipsContainer.appendChild(chip);
   });
+  
+  playersChips.appendChild(chipsContainer);
 }
 
 // ------- Render: events list -------
@@ -830,11 +1163,14 @@ function addPlayer(name, emoji) {
     return;
   }
   const id = "p_" + Date.now() + "_" + Math.floor(Math.random() * 9999);
-  state.players.push({ id, name: n, emoji });
+  const team = state.teamMode ? (state.players.length % 2 === 0 ? "blue" : "red") : null;
+  state.players.push({ id, name: n, emoji, team });
   if (!state.scores[id]) state.scores[id] = 0;
-  ensureActivePlayer();
+  state.activePlayerId = id;
   saveState();
   renderPlayersList();
+  renderPlayersChips();
+  showToast(`${n} added and selected`);
 }
 
 function removePlayer(id) {
@@ -851,6 +1187,13 @@ function removePlayer(id) {
 // ------- Event tap (local + remote) -------
 
 function handleEventTap(eventKey, label, el) {
+  // Check cooldown (applies to both local and remote)
+  const lastTs = state.cooldowns[eventKey];
+  if (lastTs && Date.now() - lastTs < COOLDOWN_MS) {
+    showToast("Wait a moment before tapping again.");
+    return;
+  }
+  
   // Remote: write tap to Firebase so all devices in this room see it
   if (isRemoteActive() && remotePlayerId && typeof db !== "undefined") {
     const roomRef = db.ref("rooms/" + getRoomCodeLabel());
@@ -870,11 +1213,19 @@ function handleEventTap(eventKey, label, el) {
 
     historyRef.child(actionId).set(action);
     scoresRef.transaction((current) => (current || 0) + 1);
+    
+    // Set local cooldown
+    state.cooldowns[eventKey] = now;
 
-    el.classList.add("pressed");
+    el.classList.add("pressed", "cooling");
     setTimeout(() => {
       el.classList.remove("pressed");
     }, 220);
+    setTimeout(() => {
+      if (Date.now() - state.cooldowns[eventKey] >= COOLDOWN_MS) {
+        el.classList.remove("cooling");
+      }
+    }, COOLDOWN_MS + 100);
 
     showToast("You got it!");
     return;
@@ -888,11 +1239,6 @@ function handleEventTap(eventKey, label, el) {
   ensureActivePlayer();
   if (!state.activePlayerId) {
     showToast("Choose who is tapping.");
-    return;
-  }
-  const lastTs = state.cooldowns[eventKey];
-  if (lastTs && Date.now() - lastTs < COOLDOWN_MS) {
-    showToast("Locked for a moment so nobody can spam it.");
     return;
   }
   const action = {
@@ -929,6 +1275,12 @@ function handleEventTap(eventKey, label, el) {
 
 function vetoLastTap() {
   if (isRemoteActive() && typeof db !== "undefined") {
+    // Only host can veto in remote mode
+    if (!isRoomHost) {
+      showToast("Only the host can veto points.");
+      return;
+    }
+    
     const roomRef = db.ref("rooms/" + getRoomCodeLabel());
     const historyRef = roomRef.child("history");
 
@@ -1046,6 +1398,19 @@ function initFromState() {
   }
   roomCodeInput.value = getRoomCodeLabel();
 
+  if (teamModeToggle) {
+    teamModeToggle.checked = state.teamMode || false;
+    if (state.teamMode) {
+      teamRosterSection.classList.remove("hidden");
+      teamModeHint.textContent = "Blue vs Red: player scores combine into team totals.";
+      if (state.rosterLocked) {
+        teamRosterSection.classList.add("roster-locked");
+        if (lockRosterBtn) lockRosterBtn.textContent = "Unlock Roster";
+      }
+    }
+    renderTeamRoster();
+  }
+
   updateModeHint();
   renderPlayersList();
   renderListsScreen();
@@ -1085,7 +1450,7 @@ addPlayerBtn.addEventListener("click", () => {
     showToast("In multi-device mode, each phone is its own player. Just open this page on each device.");
     return;
   }
-  addPlayer(playerNameInput.value, playerAvatarSelect.value);
+  addPlayer(playerNameInput.value, selectedAvatar);
   playerNameInput.value = "";
   playerNameInput.focus();
 });
@@ -1096,8 +1461,57 @@ playerNameInput.addEventListener("keypress", (e) => {
       showToast("In multi-device mode, each phone is its own player.");
       return;
     }
-    addPlayer(playerNameInput.value, playerAvatarSelect.value);
+    addPlayer(playerNameInput.value, selectedAvatar);
     playerNameInput.value = "";
+  }
+});
+
+// Avatar modal functions
+function openAvatarModal() {
+  avatarGrid.innerHTML = "";
+  ALL_EMOJIS.forEach(emoji => {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "avatar-option";
+    if (emoji === selectedAvatar) {
+      option.classList.add("selected");
+    }
+    option.textContent = emoji;
+    option.addEventListener("click", () => {
+      avatarGrid.querySelectorAll(".avatar-option").forEach(o => o.classList.remove("selected"));
+      option.classList.add("selected");
+    });
+    avatarGrid.appendChild(option);
+  });
+  avatarModal.classList.add("open");
+}
+
+function closeAvatarModal() {
+  avatarModal.classList.remove("open");
+}
+
+function saveAvatarSelection() {
+  const selected = avatarGrid.querySelector(".avatar-option.selected");
+  if (selected) {
+    selectedAvatar = selected.textContent;
+    selectedAvatarPreview.textContent = selectedAvatar;
+    
+    // If in remote mode, update Firebase
+    if (isRemoteActive() && remotePlayerId) {
+      const rawCode = getRoomCodeLabel();
+      db.ref("rooms/" + rawCode + "/players/" + remotePlayerId + "/emoji").set(selectedAvatar);
+      showToast("Avatar updated!");
+    }
+  }
+  closeAvatarModal();
+}
+
+chooseAvatarBtn.addEventListener("click", openAvatarModal);
+avatarModalCloseBtn.addEventListener("click", closeAvatarModal);
+avatarSaveBtn.addEventListener("click", saveAvatarSelection);
+avatarModal.addEventListener("click", (e) => {
+  if (e.target === avatarModal) {
+    closeAvatarModal();
   }
 });
 
@@ -1125,6 +1539,12 @@ eventSearchInput.addEventListener("input", () => {
 
 vetoBtn.addEventListener("click", vetoLastTap);
 resetScoresBtn.addEventListener("click", resetScores);
+
+teamModeToggle.addEventListener("change", () => {
+  toggleTeamMode(teamModeToggle.checked);
+});
+
+lockRosterBtn.addEventListener("click", toggleRosterLock);
 
 // Settings UI
 settingsBtn.addEventListener("click", () => {
@@ -1203,11 +1623,111 @@ if (tutorialSlidesWrapper) {
   });
 }
 
+// ------- Google Auth -------
+
+function signInWithGoogle() {
+  if (typeof auth === "undefined" || typeof googleProvider === "undefined") {
+    showToast("Authentication not available.");
+    return;
+  }
+  
+  auth.signInWithPopup(googleProvider)
+    .then((result) => {
+      showToast("Signed in successfully!");
+    })
+    .catch((error) => {
+      console.error("Sign-in error:", error);
+      if (error.code === "auth/popup-closed-by-user") {
+        showToast("Sign-in cancelled.");
+      } else if (error.code === "auth/unauthorized-domain") {
+        showToast("This domain is not authorized for sign-in.");
+      } else {
+        showToast("Sign-in failed. Please try again.");
+      }
+    });
+}
+
+function signOut() {
+  if (typeof auth === "undefined") {
+    showToast("Authentication not available.");
+    return;
+  }
+  
+  auth.signOut()
+    .then(() => {
+      showToast("Signed out successfully.");
+    })
+    .catch((error) => {
+      console.error("Sign-out error:", error);
+      showToast("Sign-out failed.");
+    });
+}
+
+function updateAuthUI(user) {
+  currentUser = user;
+  
+  if (user) {
+    const displayName = user.displayName || user.email || "User";
+    const photoURL = user.photoURL || "";
+    
+    if (userInfoEl) userInfoEl.classList.remove("hidden");
+    if (googleSignInBtn) googleSignInBtn.classList.add("hidden");
+    if (userAvatarEl && photoURL) {
+      userAvatarEl.src = photoURL;
+      userAvatarEl.classList.remove("hidden");
+    }
+    if (userNameEl) userNameEl.textContent = displayName.split(" ")[0];
+    
+    if (settingsUserInfo) settingsUserInfo.classList.remove("hidden");
+    if (settingsSignInBtn) settingsSignInBtn.classList.add("hidden");
+    if (settingsSignOutBtn) settingsSignOutBtn.classList.remove("hidden");
+    if (settingsUserAvatar && photoURL) settingsUserAvatar.src = photoURL;
+    if (settingsUserName) settingsUserName.textContent = displayName;
+    
+    if (!state.hostName && hostNameInput) {
+      state.hostName = displayName.split(" ")[0];
+      hostNameInput.value = state.hostName;
+      saveState();
+    }
+  } else {
+    if (userInfoEl) userInfoEl.classList.add("hidden");
+    if (googleSignInBtn) googleSignInBtn.classList.remove("hidden");
+    
+    if (settingsUserInfo) settingsUserInfo.classList.add("hidden");
+    if (settingsSignInBtn) settingsSignInBtn.classList.remove("hidden");
+    if (settingsSignOutBtn) settingsSignOutBtn.classList.add("hidden");
+  }
+}
+
+function initAuth() {
+  if (typeof auth === "undefined") {
+    console.warn("Firebase Auth not available.");
+    if (googleSignInBtn) googleSignInBtn.classList.add("hidden");
+    if (settingsSignInBtn) settingsSignInBtn.classList.add("hidden");
+    return;
+  }
+  
+  auth.onAuthStateChanged((user) => {
+    updateAuthUI(user);
+  });
+  
+  if (googleSignInBtn) {
+    googleSignInBtn.addEventListener("click", signInWithGoogle);
+  }
+  if (settingsSignInBtn) {
+    settingsSignInBtn.addEventListener("click", signInWithGoogle);
+  }
+  if (settingsSignOutBtn) {
+    settingsSignOutBtn.addEventListener("click", signOut);
+  }
+}
+
 // ------- Boot -------
 
 loadState();
 applySavedPreferences();
 initFromState();
+initAuth();
 if (USE_REMOTE && getRoomCodeLabel()) {
   joinRemoteRoomIfNeeded();
 }
