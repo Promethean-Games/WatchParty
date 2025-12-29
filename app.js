@@ -15,12 +15,12 @@ const USE_REMOTE = true;
 
 // Sample starter lists
 const SAMPLE_LISTS = [
-  // MOVIES
+  // ========== MOVIES ==========
   {
     id: "movie_tropes",
     source: "sample",
     name: "Blockbuster – Movie Night Tropes",
-    category: "Movie",
+    category: "Movies",
     events: [
       "Opening shot over a city skyline",
       "Someone says \"I have a bad feeling about this\"",
@@ -35,50 +35,14 @@ const SAMPLE_LISTS = [
     ]
   },
 
-  // LIVE SPORTS
-  {
-    id: "sports_nfl",
-    source: "sample",
-    name: "NFL – Sunday Chaos",
-    category: "Sports",
-    events: [
-      "Field goal blocked",
-      "Turnover in the red zone",
-      "Coach slams headset or clipboard",
-      "Challenge flag thrown",
-      "Broadcaster says \"momentum shift\"",
-      "QB gets sacked on 3rd down",
-      "One-handed catch",
-      "Flag on a huge play",
-      "Time-out right before a kick",
-      "Booth mentions fantasy football"
-    ]
-  },
-  {
-    id: "sports_nba",
-    source: "sample",
-    name: "NBA – Crunch Time Energy",
-    category: "Sports",
-    events: [
-      "Fast-break dunk",
-      "Player gets a technical foul",
-      "Coach calls timeout after a big run",
-      "Commentator says \"that’s a heat check\"",
-      "Replay review for out-of-bounds or foul",
-      "Crowd starts a loud chant",
-      "3-pointer from way beyond the arc",
-      "And-one free throw",
-      "Someone complains about a no-call",
-      "Announcer says \"this crowd is electric\""
-    ]
-  },
+  // ========== SPORTS ==========
 
-  // TV / SERIES
+  // ========== TV ==========
   {
     id: "tv_drama",
     source: "sample",
     name: "Prime Time Drama – Twist Watch",
-    category: "Series",
+    category: "TV",
     events: [
       "\"We need to talk\" moment",
       "Someone overhears a conversation they shouldn’t",
@@ -96,7 +60,7 @@ const SAMPLE_LISTS = [
     id: "tv_sitcom",
     source: "sample",
     name: "Comfort Sitcom – Laugh Track Bingo",
-    category: "Series",
+    category: "TV",
     events: [
       "Door slam for comedic effect",
       "Obvious studio audience laugh",
@@ -111,12 +75,221 @@ const SAMPLE_LISTS = [
     ]
   },
 
-  // OTHER / FAMILY / PARTY
+  // ========== SPORTS ==========
+  // Basketball
   {
-    id: "other_family",
+    id: "sports_bball_regular",
+    source: "sample",
+    name: "Regular Season",
+    category: "Sports",
+    sport: "Basketball",
+    events: [
+      "Fast-break dunk or alley-oop",
+      "Back-to-back threes by the same team",
+      "Announcer calls a \"run\" (like 10-0)",
+      "Coach calls timeout right after momentum swings",
+      "Replay of a controversial call",
+      "Coach challenges a call",
+      "Technical foul",
+      "\"He's in foul trouble\" is said",
+      "A player gets 3 fouls before halftime",
+      "Shot clock violation (or barely beats it)",
+      "Big block leads to points the other way",
+      "Crowd starts a \"DE-FENSE\" chant",
+      "Buzzer-beater attempt to end a quarter",
+      "A coach is visibly heated on the sideline"
+    ]
+  },
+  {
+    id: "sports_bball_playoffs",
+    source: "sample",
+    name: "Playoffs",
+    category: "Sports",
+    sport: "Basketball",
+    events: [
+      "\"Playoff intensity\" gets mentioned",
+      "Crowd goes nuclear after a big play",
+      "A star scores 6+ straight points",
+      "\"Every possession matters\" is said",
+      "Flagrant foul review",
+      "Coach challenges a call",
+      "Starter plays the entire 4th quarter",
+      "Intentional fouling late",
+      "Missed free throws become a storyline",
+      "Timeout called to stop a run",
+      "Big defensive stop highlighted on replay",
+      "Close out-of-bounds call review",
+      "\"This feels like a Game 7\" is said",
+      "Final possession can win or tie"
+    ]
+  },
+  {
+    id: "sports_bball_championship",
+    source: "sample",
+    name: "Championship",
+    category: "Sports",
+    sport: "Basketball",
+    events: [
+      "\"Legacy\" or \"history\" gets mentioned",
+      "Celebrity/legend shown courtside",
+      "Trophy shot tease",
+      "MVP conversation on the broadcast",
+      "Coach challenge in the 4th quarter",
+      "Game comes down to the final minute",
+      "Clutch three to tie or take the lead",
+      "Long replay stoppage on a key call",
+      "Camera cuts to nervous fans",
+      "Timeout to draw up \"the play\"",
+      "Confetti is visible/prepped",
+      "Emotional postgame moment/tears"
+    ]
+  },
+  // Football
+  {
+    id: "sports_football_regular",
+    source: "sample",
+    name: "Regular Season",
+    category: "Sports",
+    sport: "Football",
+    events: [
+      "Big hit gets a huge crowd reaction",
+      "Announcer says \"You gotta make that tackle\"",
+      "Sack",
+      "Turnover (INT or fumble)",
+      "Missed field goal",
+      "Trick play attempt",
+      "Challenge flag thrown",
+      "Red zone stand",
+      "3-and-out",
+      "25+ yard pass play",
+      "Two-minute drill before halftime",
+      "Delay of game or burned timeout",
+      "Penalty wipes out a big play",
+      "Goal-line quarterback sneak",
+      "\"This crowd is loud\" gets mentioned"
+    ]
+  },
+  {
+    id: "sports_football_playoffs",
+    source: "sample",
+    name: "Playoffs",
+    category: "Sports",
+    sport: "Football",
+    events: [
+      "\"Win and advance\" is said",
+      "Crowd towels / insane noise shots",
+      "Fourth-down go-for-it decision",
+      "Goal-line stand",
+      "Special teams play",
+      "Two-minute drill with season on the line",
+      "Star playing hurt gets mentioned",
+      "Penalty on a crucial third down",
+      "Field goal attempt over 55 yards",
+      "Announcer mentions \"Overtime\"",
+      "Replay review on a catch/spot"
+    ]
+  },
+  {
+    id: "sports_football_championship",
+    source: "sample",
+    name: "Championship",
+    category: "Sports",
+    sport: "Football",
+    events: [
+      "\"Legacy/dynasty\" talk",
+      "Big-event spectacle mention (anthem/flyover/celebs)",
+      "Turnover changes everything",
+      "Highlight catch/play replayed repeatedly",
+      "Two-point conversion attempt",
+      "Timeout to set up a must-have drive",
+      "Replay booth deep dive on a key call",
+      "Late-game fourth-down decision",
+      "Missed kick becomes a storyline",
+      "Final drive with the season on the line",
+      "Defensive stop seals it",
+      "MVP talk ramps up",
+      "Confetti visible/prep shots",
+      "Trophy presentation tease",
+      "Emotional postgame moment"
+    ]
+  },
+  // Baseball
+  {
+    id: "sports_baseball_regular",
+    source: "sample",
+    name: "Regular Season",
+    category: "Sports",
+    sport: "Baseball",
+    events: [
+      "Strikeout looking",
+      "Home run",
+      "Double play",
+      "Stolen base attempt",
+      "Pitcher shakes off catcher",
+      "Manager visits the mound",
+      "Bench reaction on a big play",
+      "Defensive shift mentioned",
+      "7th inning stretch",
+      "Foul ball into the stands",
+      "Pitcher hits a batter",
+      "Close call at a base",
+      "Pinch hitter announced",
+      "Walk with bases loaded",
+      "Diving catch"
+    ]
+  },
+  {
+    id: "sports_baseball_playoffs",
+    source: "sample",
+    name: "Playoffs",
+    category: "Sports",
+    sport: "Baseball",
+    events: [
+      "\"Every pitch matters\" is said",
+      "Crowd gets loud on two strikes",
+      "Starter pulled early",
+      "Intentional walk",
+      "Sac bunt / \"move the runner\" play",
+      "Close play at the plate",
+      "Replay review in a tense moment",
+      "Clutch two-out RBI hit",
+      "Manager is fired up in the dugout",
+      "\"Pressure\" / \"nerves\" gets mentioned",
+      "Closer entrance gets hype",
+      "Final inning: everyone standing"
+    ]
+  },
+  {
+    id: "sports_baseball_championship",
+    source: "sample",
+    name: "Championship",
+    category: "Sports",
+    sport: "Baseball",
+    events: [
+      "\"Storybook\" / \"all the marbles\" talk",
+      "Star gets pitched around or intentionally walked",
+      "Huge HR or extra-base hit flips the game",
+      "Pitching change",
+      "Ace vs ace storyline referenced",
+      "Replay deep-dive on a key call",
+      "Late-inning clutch defensive play",
+      "Bullpen tightrope inning",
+      "Two-out rally starts",
+      "Big fair/foul or catch/no-catch moment",
+      "Final out tension is obvious",
+      "Dogpile/celebration happens",
+      "Trophy ceremony tease",
+      "MVP talk ramps up",
+      "Emotional interview"
+    ]
+  },
+
+  // ========== FAMILY/FRIENDS ==========
+  {
+    id: "family_gathering",
     source: "sample",
     name: "Family Gathering – Chaos Mode",
-    category: "Other",
+    category: "Family/Friends",
     events: [
       "Someone brings up an old embarrassing story",
       "Two people talk over each other",
@@ -124,7 +297,7 @@ const SAMPLE_LISTS = [
       "Someone disappears to \"check on the food\"",
       "Phone comes out to show a meme or video",
       "Family photo attempt takes way too long",
-      "Someone says \"remember when…\"",
+      "Someone says \"remember when...\"",
       "Food or drink is spilled",
       "Inside joke nobody explains to new people",
       "Conversation suddenly gets way too deep"
@@ -1213,8 +1386,94 @@ function buildListCard(list, source) {
 
 function renderListsScreen() {
   sampleListsEl.innerHTML = "";
+  
+  // Group lists by category
+  const categories = {};
+  const categoryOrder = ["Movies", "TV", "Sports", "Family/Friends", "Other"];
+  const sportOrder = ["Basketball", "Football", "Baseball"];
+  
   SAMPLE_LISTS.forEach((list) => {
-    sampleListsEl.appendChild(buildListCard(list, "sample"));
+    const cat = list.category || "Other";
+    if (!categories[cat]) categories[cat] = [];
+    categories[cat].push(list);
+  });
+  
+  // Render accordion for each category
+  categoryOrder.forEach((cat) => {
+    if (!categories[cat] || !categories[cat].length) return;
+    
+    const accordion = document.createElement("div");
+    accordion.className = "list-accordion";
+    
+    const header = document.createElement("button");
+    header.className = "accordion-header";
+    header.innerHTML = `
+      <span class="accordion-title">${cat}</span>
+      <span class="accordion-count">${categories[cat].length} list${categories[cat].length !== 1 ? 's' : ''}</span>
+      <span class="accordion-icon">+</span>
+    `;
+    
+    const content = document.createElement("div");
+    content.className = "accordion-content";
+    
+    // Special handling for Sports - create nested accordions by sport
+    if (cat === "Sports") {
+      const sports = {};
+      categories[cat].forEach((list) => {
+        const sport = list.sport || "Other";
+        if (!sports[sport]) sports[sport] = [];
+        sports[sport].push(list);
+      });
+      
+      sportOrder.forEach((sport) => {
+        if (!sports[sport] || !sports[sport].length) return;
+        
+        // Always create nested accordion for each sport (collapsed by default)
+        const sportAccordion = document.createElement("div");
+        sportAccordion.className = "list-accordion nested";
+        
+        const sportHeader = document.createElement("button");
+        sportHeader.className = "accordion-header nested";
+        sportHeader.innerHTML = `
+          <span class="accordion-title">${sport}</span>
+          <span class="accordion-count">${sports[sport].length}</span>
+          <span class="accordion-icon">+</span>
+        `;
+        
+        const sportContent = document.createElement("div");
+        sportContent.className = "accordion-content";
+        
+        sports[sport].forEach((list) => {
+          sportContent.appendChild(buildListCard(list, "sample"));
+        });
+        
+        sportHeader.addEventListener("click", (e) => {
+          e.stopPropagation();
+          sportAccordion.classList.toggle("open");
+        });
+        
+        sportAccordion.appendChild(sportHeader);
+        sportAccordion.appendChild(sportContent);
+        content.appendChild(sportAccordion);
+      });
+    } else {
+      categories[cat].forEach((list) => {
+        content.appendChild(buildListCard(list, "sample"));
+      });
+    }
+    
+    header.addEventListener("click", () => {
+      const isOpen = accordion.classList.contains("open");
+      // Close all top-level accordions
+      document.querySelectorAll("#sampleLists > .list-accordion.open").forEach(a => {
+        if (a !== accordion) a.classList.remove("open");
+      });
+      accordion.classList.toggle("open", !isOpen);
+    });
+    
+    accordion.appendChild(header);
+    accordion.appendChild(content);
+    sampleListsEl.appendChild(accordion);
   });
 
   customListsEl.innerHTML = "";
@@ -1226,9 +1485,33 @@ function renderListsScreen() {
     customListsEl.appendChild(p);
   } else {
     customListsEl.classList.remove("empty-state");
+    
+    // Custom lists accordion
+    const accordion = document.createElement("div");
+    accordion.className = "list-accordion open";
+    
+    const header = document.createElement("button");
+    header.className = "accordion-header";
+    header.innerHTML = `
+      <span class="accordion-title">My Lists</span>
+      <span class="accordion-count">${state.customLists.length} list${state.customLists.length !== 1 ? 's' : ''}</span>
+      <span class="accordion-icon">+</span>
+    `;
+    
+    const content = document.createElement("div");
+    content.className = "accordion-content";
+    
     state.customLists.forEach((list) => {
-      customListsEl.appendChild(buildListCard(list, "custom"));
+      content.appendChild(buildListCard(list, "custom"));
     });
+    
+    header.addEventListener("click", () => {
+      accordion.classList.toggle("open");
+    });
+    
+    accordion.appendChild(header);
+    accordion.appendChild(content);
+    customListsEl.appendChild(accordion);
   }
 
   renderProfileSummary();
